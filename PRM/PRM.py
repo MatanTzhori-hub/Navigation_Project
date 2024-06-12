@@ -108,24 +108,15 @@ class PRM:
         plt.show()
 
 def generate_obstacles():
-    # Create a list to store polygons representing walls
-    walls = []
-    
-    # Define vertices for walls
-    wall1 = [(0, 90), (0, 85), (80, 85), (80, 90)]  # First vertical wall
-    wall2 = [(100, 65), (100, 60), (20, 60), (20, 65)]  # Second vertical wall
-    wall3 = [(0, 40), (0, 35), (80, 35), (80, 40)]  # First horizontal wall
-    wall4 = [(100, 20), (100, 15), (20, 15), (20, 20)]  # Second horizontal wall
-    
-    # Append walls to the list
-    walls.append(wall1)
-    walls.append(wall2)
-    walls.append(wall3)
-    walls.append(wall4)
-
+    # Create a list to store polygons representing obstacles
     obstacles = []
-    for wall in walls:
-        obstacles.append(Polygon(wall))
+    
+    # Define vertices for walls as polygons
+    obstacles.append(Polygon([(0, 90), (0, 85), (80, 85), (80, 90)]))
+    obstacles.append(Polygon([(100, 65), (100, 60), (20, 60), (20, 65)]))
+    obstacles.append(Polygon([(0, 40), (0, 35), (80, 35), (80, 40)]))
+    obstacles.append(Polygon([(100, 20), (100, 15), (20, 15), (20, 20)]))
+
     return obstacles
 
 if __name__ == "__main__":
