@@ -25,11 +25,14 @@ initial_guess = [0,0]
 
 fig = plt.figure()
 # fig.suptitle(f'init={initial_state}, final={goal_state}', fontsize=16)
+v_optimal, phi_optimal = initial_guess
 initial_state = path[0]
 for goal_state in path[1:]:
-    v_optimal, phi_optimal = optimizer.solve(initial_state, goal_state, initial_guess)
-    optimizer.plot_trajectory(v_optimal, phi_optimal, initial_state, goal_state, initial_guess)
+    v_optimal, phi_optimal = optimizer.solve(initial_state, goal_state, [v_optimal, phi_optimal])
+    optimizer.plot_trajectory(v_optimal, phi_optimal, initial_state, goal_state, [v_optimal, phi_optimal])
     
+    dest = optimizer.destination(v_optimal, phi_optimal, initial_state)
+    plt.scatter(dest[0], dest[1], color='c', label='_Hidden label')
     initial_state = goal_state
     
 plt.show()

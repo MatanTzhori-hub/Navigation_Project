@@ -8,19 +8,49 @@ class TrajectoryOptimizer:
         self.L = L  # Wheelbase
         self.T = T  # Time horizon
         self.dt = dt  # Time step
-        self.max_iter = 1000
+        self.max_iter = 100
+
+    
+    def destination(self, v, phi, initial_state):
+        eps = 1e-5
+        phi = phi + eps
+        
+        x_s, y_s, theta_s = initial_state
+        
+        theta_f = theta_s + (v / self.L) * np.tan(phi) * self.T
+        
+        x_f = self.L/np.tan(phi)*(np.sin(theta_f)-np.sin(theta_s)) + x_s
+        y_f = self.L/np.tan(phi)*(-np.cos(theta_f)+np.cos(theta_s)) + y_s
+        
+        return x_f,y_f,theta_f
+    
+    def slice_range(self, theta1, theta2, phi):
+        eps = 1e-5
+        phi = phi + eps
+        
+        R = np.abs(self.L / np.tan(phi))
+        return R * (np.abs(theta1 - theta2))
 
     def cost_function(self, u, initial_state, goal_state):
         x, y, theta = initial_state
+        theta_init = theta
         x_goal, y_goal, theta_goal = goal_state
         v, phi = u[0], u[1]
         cost = 0
-        for _ in np.arange(0, self.T, self.dt):
-            x += v * np.cos(theta) * self.dt
-            y += v * np.sin(theta) * self.dt
-            theta += (v / self.L) * np.tan(phi) * self.dt
-        cost += (x - x_goal)**2 + (y - y_goal)**2 + (theta - theta_goal)**2
-        return cost
+        
+        if (v <= 0 or np.abs(phi) > np.pi/3):
+            return 50000
+        
+        # for _ in np.arange(0, self.T, self.dt):
+        #     x += v * np.cos(theta) * self.dt
+        #     y += v * np.sin(theta) * self.dt
+        #     theta += (v / self.L) * np.tan(phi) * self.dt
+        # cost += (x - x_goal)**2 + (y - y_goal)**2 + (theta - theta_goal)**2
+        
+        x_dest, y_dest, theta_dest = self.destination(v, phi, initial_state)
+        cost += (x_dest - x_goal)**2 + (y_dest - y_goal)**2 + (theta_dest - theta_goal)**2
+        # cost += self.slice_range(theta_init, theta_dest, phi)**2
+        return cost 
 
     def solve(self, initial_state=None, goal_state=None, inital_guess=None):
         # Initial guess for control inputs (flattened array of shape (2,))
@@ -37,7 +67,7 @@ class TrajectoryOptimizer:
         v_optimal, phi_optimal = result.x[0], result.x[1]
         return v_optimal, phi_optimal
 
-    def plot_trajectory(self, v_optimal, phi_optimal, initial_state, goal_state, initial_guess):
+    def plot_trajectory(self, v_optimal, phi_optimal, initial_state, goal_state):
         x, y, theta = initial_state
         trajectory_x, trajectory_y, trajectory_theta = [x], [y], [theta]
         for _ in np.arange(0, self.T, self.dt):
@@ -48,10 +78,10 @@ class TrajectoryOptimizer:
             trajectory_y.append(y)
             trajectory_theta.append(theta)
         
-        plt.quiver(trajectory_x, trajectory_y, np.cos(trajectory_theta), np.sin(trajectory_theta), scale=100, color='r', label='_Hidden label')
-        plt.plot(trajectory_x, trajectory_y, label=f'init_gues={initial_guess}')
-        plt.scatter(initial_state[0], initial_state[1], color='blue', label='_Hidden label')
-        plt.scatter(goal_state[0], goal_state[1], color='red', label='_Hidden label')
+        # plt.quiver(trajectory_x[::5], trajectory_y[::5], np.cos(trajectory_theta[::5]), np.sin(trajectory_theta[::5]), scale=100, color='r', label='_Hidden label')
+        plt.plot(trajectory_x, trajectory_y, color="r")
+        # plt.scatter(initial_state[0], initial_state[1], color='blue', label='_Hidden label')
+        # plt.scatter(goal_state[0], goal_state[1], color='red', label='_Hidden label')
         plt.xlabel('x')
         plt.ylabel('y')
         plt.title('Trajectory')

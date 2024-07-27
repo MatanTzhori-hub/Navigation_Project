@@ -4,6 +4,7 @@ from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon
 
 import SearchAlgo
+from Solver_Minimize import TrajectoryOptimizer
 
 class PRM:
     def __init__(self, num_nodes, distance_radius, space_limits, obstacles_map=None):
@@ -11,7 +12,10 @@ class PRM:
         self.distance_radius = distance_radius
         self.space_limits = space_limits
         self.theta_diff = np.pi / 6
+        self.max_stirring = np.pi / 3
+        self.max_dist_error = 0.05
         self.obstacles = obstacles_map
+        self.solver = TrajectoryOptimizer()
 
         self.shortest_path = None
         self.nodes = self.generate_random_nodes()
@@ -40,12 +44,23 @@ class PRM:
         tree = KDTree(self.nodes[:, :2], leafsize=15)  # KDTree for efficient nearest neighbor search
         edges = set()  # Use set to ensure uniqueness
         for i in range(self.num_nodes):
-            self.generate_edges_single_node(tree, edges, i)
+            self.generate_edges_curve_single_node(tree, edges, i)
             # Query nodes within distance radius
             
         return list(edges)
     
-    def generate_edges_single_node(self, tree, edges, node_index, check_angle=True):
+    # def generate_edges_straight_single_node(self, tree, edges, node_index, check_angle=True):
+    #     indices = tree.query_ball_point(self.nodes[node_index, :2], self.distance_radius)
+    #     for j in indices:
+    #         if node_index != j:
+    #             theta1 = self.nodes[node_index, 2]
+    #             theta2 = self.nodes[j, 2]
+    #             theta_diff = self.theta_distance(theta1, theta2)
+    #             if (not check_angle or theta_diff <= self.theta_diff) and (j,node_index) not in edges and self.obstacles_intersection(self.nodes[node_index], self.nodes[j]):
+    #                 edges.add((node_index, j))
+    #     pass
+    
+    def generate_edges_curve_single_node(self, tree, edges, node_index, check_angle=True):
         indices = tree.query_ball_point(self.nodes[node_index, :2], self.distance_radius)
         for j in indices:
             if node_index != j:
@@ -53,7 +68,21 @@ class PRM:
                 theta2 = self.nodes[j, 2]
                 theta_diff = self.theta_distance(theta1, theta2)
                 if (not check_angle or theta_diff <= self.theta_diff) and (j,node_index) not in edges and self.obstacles_intersection(self.nodes[node_index], self.nodes[j]):
-                    edges.add((node_index, j))
+                    # first direction node_index -> j
+                    opt_v, opt_delta = self.solver.solve(self.nodes[node_index], self.nodes[j])
+                    if (opt_v>0 and np.abs(opt_delta) < self.max_stirring):
+                        dest = self.solver.destination(opt_v, opt_delta,self.nodes[node_index] )
+                        slice_range = self.solver.slice_range(self.nodes[node_index][2], dest[2], opt_delta)
+                        if ((dest[0] - self.nodes[j][0])**2 + (dest[1] - self.nodes[j][1])**2) < self.max_dist_error:
+                            edges.add((node_index, j, opt_v, opt_delta, slice_range))
+                        
+                    # second direction j -> node_index
+                    opt_v, opt_delta = self.solver.solve(self.nodes[j], self.nodes[node_index])
+                    if (opt_v>0 and np.abs(opt_delta) < self.max_stirring):
+                        dest = self.solver.destination(opt_v, opt_delta,self.nodes[j] )
+                        slice_range = self.solver.slice_range(self.nodes[j][2], dest[2], opt_delta)
+                        if ((dest[0] - self.nodes[node_index][0])**2 + (dest[1] - self.nodes[node_index][1])**2) < self.max_dist_error:
+                            edges.add((j, node_index, opt_v, opt_delta, slice_range))
         pass
     
     def FindRoadMap(self, start_node, end_node, searchAlg='Dijkstra'):
@@ -64,8 +93,8 @@ class PRM:
         tree = KDTree(self.nodes[:, :2], leafsize=15)
         edges = set(self.edges)
 
-        self.generate_edges_single_node(tree, edges, start_index, check_angle=False)
-        self.generate_edges_single_node(tree, edges, end_index, check_angle=False)
+        self.generate_edges_curve_single_node(tree, edges, start_index, check_angle=False)
+        self.generate_edges_curve_single_node(tree, edges, end_index, check_angle=False)
 
         #TODO maybe add multiple search functions
         if searchAlg == 'Dijkstra':
@@ -75,8 +104,13 @@ class PRM:
         else:
             assert(0)  
         
-        self.shortest_path = self.nodes[shortest_path, :]
-
+        if len(shortest_path) > 0:
+            a = np.array(shortest_path, dtype=int)[:, 0]
+            b = np.array(shortest_path, dtype=int)[:, 1]
+            c = np.array(shortest_path)[:, 2:]
+            self.shortest_path = np.concatenate((self.nodes[a], self.nodes[b], c), axis=1).tolist()
+        else:
+            self.shortest_path = shortest_path
         # remove start and end nodes at the end.
     
 
@@ -94,10 +128,13 @@ class PRM:
             plt.plot(x,y, c='black')
 
         if self.shortest_path is not None:
-            for i in range(np.size(self.shortest_path, axis=0)-1):
-                node1 = self.shortest_path[i]
-                node2 = self.shortest_path[i+1]
-                plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red', alpha=1)
+            for i in range(np.size(self.shortest_path, axis=0)):
+                start_node = self.shortest_path[i][0:3]
+                goal_node = self.shortest_path[i][3:6]
+                v = self.shortest_path[i][6]
+                phi = self.shortest_path[i][7]
+                # plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red', alpha=1)
+                self.solver.plot_trajectory(v, phi, start_node, goal_node)
 
         plt.xlabel('X')
         plt.ylabel('Y')
@@ -121,22 +158,22 @@ def generate_obstacles():
 
 if __name__ == "__main__":
     # Constants
-    num_nodes = 1000
-    distance_radius = 10  # Adjust distance radius as needed
+    num_nodes = 500
+    distance_radius = 20  # Adjust distance radius as needed
     space_limits = [(0, 100), (0, 100)]  # Limits for x and y coordinates
 
     # Obstacles
-    # obstacle_polygons = [
-    #     Polygon([(20, 20), (80, 20), (80, 25), (20,25)]),
-    #     Polygon([(20, 60), (80, 70), (50, 80)])
-    # ]
-    obstacle_polygons = generate_obstacles()
-
+    obstacle_polygons = [
+        Polygon([(20, 20), (80, 20), (80, 25), (20,25)]),
+        Polygon([(20, 60), (80, 70), (50, 80)])
+                        ]
+    # obstacle_polygons = generate_obstacles()
+    #obstacle_polygons = []
 
     # Test
     prm = PRM(num_nodes, distance_radius, space_limits, obstacle_polygons)
-    # prm.FindRoadMap([90,5,0], [10,95,0], 'Dijkstra')
-    prm.FindRoadMap([90,5,0], [10,95,0], 'A_Star')
+    prm.FindRoadMap([10,20,0], [90,90,0], 'Dijkstra')
+    # prm.FindRoadMap([90,5,0], [10,95,0], 'A_Star')
     prm.plot()
-
+    a = 0
     
