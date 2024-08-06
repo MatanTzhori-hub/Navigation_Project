@@ -27,7 +27,7 @@ class TrajectoryOptimizer:
         
         return x_f,y_f,theta_f
     
-    def slice_range(self, theta1, theta2, phi):
+    def curve_length(self, theta1, theta2, phi):
         eps = 1e-5
         phi = phi + eps
         

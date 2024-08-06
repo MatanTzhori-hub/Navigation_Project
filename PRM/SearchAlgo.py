@@ -57,6 +57,6 @@ def Dijkstra(nodes, edges, start_node_index, end_node_index):
     
     return shortest_path, distances[end_node_index]
 
-def EuclidieanDistance(node1, node2):
-    # For simplicity, let's calculate Euclidean distance between nodes
-    return ((node1[0] - node2[0]) ** 2 + (node1[1] - node2[1]) ** 2) ** 0.5
+# def EuclidieanDistance(node1, node2):
+#     # For simplicity, let's calculate Euclidean distance between nodes
+#     return ((node1[0] - node2[0]) ** 2 + (node1[1] - node2[1]) ** 2) ** 0.5
