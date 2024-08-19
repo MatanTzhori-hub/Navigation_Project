@@ -28,20 +28,19 @@ map_5 = [ Polygon([(30,30),(60,30),(45,60)]) , Polygon([(30,50),(60,50),(45,20)]
 start_point = [10,10,0]
 end_point = [90,90,0]
 
-for T in range(1,4):
-    t_start =  time.time()
-    prm = PRM(num_nodes, distance_radius, space_limits,start_point,end_point,T, map_5, seed)
-    prm.FindRoadMap(start_point, end_point, 'Dijkstra')
-    t_end =  time.time()
+t_start =  time.time()
+prm = PRM(num_nodes, distance_radius, space_limits,start_point,end_point, map_5, seed)
+prm.FindRoadMap(start_point, end_point, 'Dijkstra')
+t_end =  time.time()
 
-    f = prm.plot()
+f = prm.plot()
 
-    print("SimTime:" ,t_end-t_start)
-    # prm.plotAsSingles()
-    date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-    plt.title(f"""Elapsed time: {t_end-t_start:.2f}\n 
-                Number of Nodes: {prm.num_nodes}, Connect Radius: {prm.distance_radius}, T: {T}\n 
-                Theta diff before: {prm.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm.theta_diff_after*(180/np.pi):.1f}""")
-    f.savefig(f"fig/solution_{date}.png", dpi=500)
+print("SimTime:" ,t_end-t_start)
+# prm.plotAsSingles()
+date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
+plt.title(f"""Elapsed time: {t_end-t_start:.2f}\n 
+            Number of Nodes: {prm.num_nodes}, Connect Radius: {prm.distance_radius}\n 
+            Theta diff before: {prm.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm.theta_diff_after*(180/np.pi):.1f}""")
+f.savefig(f"fig/solution_{date}.png", dpi=500)
 
-    #plt.show()
+#plt.show()

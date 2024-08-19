@@ -3,7 +3,7 @@ from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 
 class TrajectoryOptimizer:
-    def __init__(self, L=2.0, T=1, dt=0.01, distance_radius = 10):
+    def __init__(self, L=2.0, T=1, distance_radius = 10):
         self.L = L  # Wheelbase
         self.T = T  # Time horizon
         self.dt = self.T / 100  # Time step

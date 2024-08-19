@@ -7,10 +7,9 @@ from .SearchAlgo import *
 from .Solver_Minimize import TrajectoryOptimizer
 
 class PRM:
-    def __init__(self, num_nodes, distance_radius, space_limits, start_point,end_point,T=1,obstacles_map=None, seed=None):
+    def __init__(self, num_nodes, distance_radius, space_limits, start_point,end_point,obstacles_map=None, seed=None):
         self.num_nodes = num_nodes
         self.distance_radius = distance_radius
-        self.T = T
         self.space_limits = space_limits
         self.obstacles = obstacles_map
         #limitation on road:
@@ -23,7 +22,7 @@ class PRM:
         self.end_point = end_point
 
         #solver's data:
-        self.solver = TrajectoryOptimizer(T=self.T, distance_radius=self.distance_radius)
+        self.solver = TrajectoryOptimizer(distance_radius=self.distance_radius)
         self.shortest_path = None
 
         self.nodes = self.generate_random_nodes(seed)
@@ -79,6 +78,9 @@ class PRM:
                     return True
         return False
 
+    def oclidian_distance(self, x1, y1, x2, y2):
+        return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
     def limit_by_distance(self, x1, y1, x2, y2):
         if ((x1 - x2)**2 + (y1 - y2)**2) < self.max_dist_error:
             return True
@@ -111,7 +113,11 @@ class PRM:
             if node_index != idx:
                 begin_node = self.nodes[node_index]
                 end_node = self.nodes[idx]
-
+                T_calc = self.oclidian_distance(begin_node[0], begin_node[1], end_node[0], end_node[1]) / 10
+                if (T_calc >8): T_calc =8
+                if (T_calc<1): T_calc = 1
+                self.solver.T = T_calc
+                
                 theta_limited = self.limit_by_theta(begin_node[2], end_node[2],self.theta_diff_before)
                 if ( theta_limited ):
                     v, stir = self.solver.solve(begin_node, end_node)
@@ -126,7 +132,7 @@ class PRM:
                         limit_good = self.limit_by_distance(end_node[0], end_node[1], trajectory[0][-1], trajectory[1][-1])
 
                         if (limit_good and theta_limited and not (self.obstacles_trajectory_intersection(trajectory) ) ):
-                            edges.add((node_index, idx, v, stir, weight))
+                            edges.add((node_index, idx, v, stir, weight, self.solver.T))
 
 
     def FindRoadMap(self, start_node, end_node, searchAlg='Dijkstra'):
@@ -175,6 +181,7 @@ class PRM:
                 v = self.shortest_path[i][6]
                 phi = self.shortest_path[i][7]
                 # plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red', alpha=1)
+                self.solver.T = self.shortest_path[i][9]
                 self.solver.plot_trajectory(v, phi, start_node)
 
         # Plot start point
