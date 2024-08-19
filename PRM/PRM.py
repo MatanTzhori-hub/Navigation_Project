@@ -7,138 +7,137 @@ from .SearchAlgo import *
 from .Solver_Minimize import TrajectoryOptimizer
 
 class PRM:
-    def __init__(self, num_nodes, distance_radius, space_limits, obstacles_map=None):
+    def __init__(self, num_nodes, distance_radius, space_limits, start_point,end_point, obstacles_map=None, seed=None):
         self.num_nodes = num_nodes
         self.distance_radius = distance_radius
         self.space_limits = space_limits
-        self.theta_diff = np.pi / 2
-        self.max_stirring = np.pi / 3
-        self.max_dist_error = 0.05
         self.obstacles = obstacles_map
-        self.solver = TrajectoryOptimizer(theta_diff=self.theta_diff, distance_radius=self.distance_radius)
+        #limitation on road:
+        self.theta_diff_before = 135 * np.pi/180  # before finding solution
+        self.theta_diff_after = 60 * np.pi/180   # after finding solution
+        self.max_stirring = np.pi/2
+        self.max_dist_error =0.05 #in meter
 
+        self.start_point = start_point
+        self.end_point = end_point
+
+        #solver's data:
+        self.solver = TrajectoryOptimizer(T=1, distance_radius=self.distance_radius)
         self.shortest_path = None
-        self.nodes = self.generate_random_nodes()
+
+        self.nodes = self.generate_random_nodes(seed)
         self.edges = self.generate_edges()
 
-    def generate_random_nodes(self):
+    def generate_random_nodes(self, seed=None):
+        print("-- Generating Nodes --")
+        if seed is not None:
+            np.random.seed(seed)
+
         nodes = np.random.rand(self.num_nodes, 3)  # (x, y, theta)
-        nodes[:, 0] = nodes[:, 0] * (self.space_limits[0][1] - self.space_limits[0][0]) + self.space_limits[0][0]  # scale x
-        nodes[:, 1] = nodes[:, 1] * (self.space_limits[1][1] - self.space_limits[1][0]) + self.space_limits[1][0]  # scale y
-        nodes[:, 2] = nodes[:, 2] * (2*np.pi) # angle in radians
-            
+        nodes[:, 0] = nodes[:, 0] * (self.space_limits[0][1] - self.space_limits[0][0]) + self.space_limits[0][0]
+        nodes[:, 1] = nodes[:, 1] * (self.space_limits[1][1] - self.space_limits[1][0]) + self.space_limits[1][0]
+        nodes[:, 2] = nodes[:, 2] * (2*np.pi) 
+        nodes = np.concatenate((nodes, np.reshape(self.start_point, (1,3)), np.reshape(self.end_point, (1,3))), axis=0)
+        
+        np.random.seed(None)
         return nodes
 
-    def theta_distance(self, theta1, theta2):
-        diff = abs(theta1 - theta2) % (2 * np.pi)
-        return 2 * np.pi - diff if diff > np.pi else diff
+    # def theta_distance(self, theta1, theta2):
+    #     diff = abs(theta1 - theta2) % (2 * np.pi)
+    #     return 2 * np.pi - diff if diff > np.pi else diff
     
-    def check_theta_limitation(self, node1, node2):
-        x1, y1, theta1 = node1
-        x2, y2, theta2 = node2
-        theta3 = self.angle_between_points((x1, y1),(x2, y2))
+    # def check_theta_limitation(self, node1, node2):
+    #     x1, y1, theta1 = node1
+    #     x2, y2, theta2 = node2
+    #     theta3 = self.angle_between_points((x1, y1),(x2, y2))
+    #     return self.theta_distance(theta1, theta3) < self.theta_diff and self.theta_distance(theta2, theta3) < self.theta_diff
         
-        return self.theta_distance(theta1, theta3) < self.theta_diff and self.theta_distance(theta2, theta3) < self.theta_diff
-        
-    def angle_between_points(self, p1, p2):
-        x1, y1 = p1
-        x2, y2 = p2
-        
-        # Compute the dot product
-        dot_product = x1 * x2 + y1 * y2
-        
-        # Compute the magnitudes of the vectors
-        magnitude_p1 = np.sqrt(x1**2 + y1**2)
-        magnitude_p2 = np.sqrt(x2**2 + y2**2)
-        
-        # Compute the cosine of the angle
-        cos_theta = dot_product / (magnitude_p1 * magnitude_p2)
-        
-        # Clamp the value to avoid numerical issues with arccos
-        cos_theta = np.clip(cos_theta, -1.0, 1.0)
-        
-        # Compute the angle in radians
-        theta = np.arccos(cos_theta)
-        
-        return theta
+    # def angle_between_points(self, p1, p2):
+    #     x1, y1 = p1
+    #     x2, y2 = p2
+    #     dot_product = x1 * x2 + y1 * y2
+    #     magnitude_p1 = np.sqrt(x1**2 + y1**2)
+    #     magnitude_p2 = np.sqrt(x2**2 + y2**2)
+    #     cos_theta = dot_product / (magnitude_p1 * magnitude_p2)
+    #     cos_theta = np.clip(cos_theta, -1.0, 1.0)
+    #     theta = np.arccos(cos_theta)
+    #     return theta
         
 
     def obstacles_line_intersection(self, node1, node2):
         line = LineString([(node1[0], node1[1]), (node2[0], node2[1])])
-
         for obstacle in self.obstacles:
             if obstacle.intersects(line):
                 return True
         return False
     
     def obstacles_trajectory_intersection(self, trajectory: list):
-        
         for obstacle in self.obstacles:
             for point in zip(trajectory[0][::10], trajectory[1][::10]):
                 if obstacle.intersects(Point(point)):
                     return True
         return False
 
-    def check_max_distance(self, x1, y1, x2, y2):
-        return ((x1 - x2)**2 + (y1 - y2**2)) < self.max_dist_error
+    def limit_by_distance(self, x1, y1, x2, y2):
+        if ((x1 - x2)**2 + (y1 - y2)**2) < self.max_dist_error:
+            return True
+        return False
+    
+    def limit_by_theta(self, theta1, theta2, theta_error):
+        if np.abs(theta1 - theta2) < theta_error:
+            return True
+        return False
+    
+    def limit_by_velocity_stirring(self, v, stirring):
+        if ( v > 0 and np.abs(stirring) < self.max_stirring):
+            return True
+        return False
+
 
     def generate_edges(self):
+        print("-- Generating Edges --")
+
         tree = KDTree(self.nodes[:, :2])  # KDTree for efficient nearest neighbor search
         edges = set()  # Use set to ensure uniqueness
-        for i in range(self.num_nodes):
-            self.generate_edges_curve_single_node(tree, edges, i)
-            # Query nodes within distance radius
-            
+        for i in range(self.num_nodes+2):
+            self.generate_edges_curve_single_node(tree, edges, i)     
         return list(edges)
-    
-    # Generates straight edges
-    # def generate_edges_straight_single_node(self, tree, edges, node_index, check_angle=True):
-    #     indices = tree.query_ball_point(self.nodes[node_index, :2], self.distance_radius)
-    #     for j in indices:
-    #         if node_index != j:
-    #             theta1 = self.nodes[node_index, 2]
-    #             theta2 = self.nodes[j, 2]
-    #             theta_diff = self.theta_distance(theta1, theta2)
-    #             if (not check_angle or theta_diff <= self.theta_diff) and (j,node_index) not in edges and self.obstacles_line_intersection(self.nodes[node_index], self.nodes[j]):
-    #                 edges.add((node_index, j))
-    #     pass
-    
-    def generate_edges_curve_single_node(self, tree, edges, node_index, check_angle=True):
+
+    #generate all solutions between node_index to all neighbors within distance_radius
+    def generate_edges_curve_single_node(self, tree, edges, node_index):
         indices = tree.query_ball_point(self.nodes[node_index, :2], self.distance_radius)
-        for j in indices:
-            if node_index != j:
-                if (check_angle and self.check_theta_limitation(self.nodes[node_index], self.nodes[j])) and (j,node_index) not in edges and not self.obstacles_line_intersection(self.nodes[node_index], self.nodes[j]):
-                    # first direction node_index -> j
-                    opt_v, opt_delta = self.solver.solve(self.nodes[node_index], self.nodes[j])
-                    if (opt_v>0 and np.abs(opt_delta) < self.max_stirring):
-                        trajectory = self.solver.get_trajectory(opt_v, opt_delta, self.nodes[node_index])
-                        dest = self.solver.destination(opt_v, opt_delta,self.nodes[node_index] )
-                        slice_range = self.solver.curve_length(self.nodes[node_index][2], dest[2], opt_delta)
-                        if (not self.obstacles_trajectory_intersection(trajectory) and self.check_max_distance(self.nodes[j][0], self.nodes[j][1], dest[0], dest[1])):
-                            edges.add((node_index, j, opt_v, opt_delta, slice_range))
-                        
-                    # second direction j -> node_index
-                    opt_v, opt_delta = self.solver.solve(self.nodes[j], self.nodes[node_index])
-                    if (opt_v>0 and np.abs(opt_delta) < self.max_stirring):
-                        trajectory = self.solver.get_trajectory(opt_v, opt_delta, self.nodes[j])
-                        dest = self.solver.destination(opt_v, opt_delta,self.nodes[j] )
-                        slice_range = self.solver.curve_length(self.nodes[j][2], dest[2], opt_delta)
-                        if (not self.obstacles_trajectory_intersection(trajectory) and self.check_max_distance(self.nodes[node_index][0], self.nodes[node_index][1], dest[0], dest[1])):
-                            edges.add((j, node_index, opt_v, opt_delta, slice_range))
-        pass
-    
+        for idx in indices:
+            if node_index != idx:
+                begin_node = self.nodes[node_index]
+                end_node = self.nodes[idx]
+
+                theta_limited = self.limit_by_theta(begin_node[2], end_node[2],self.theta_diff_before)
+                if ( theta_limited ):
+                    v, stir = self.solver.solve(begin_node, end_node)
+                    solution_limit = self.limit_by_velocity_stirring(v,stir)
+                    if (solution_limit):
+                        trajectory = self.solver.get_trajectory(v, stir, begin_node)
+                        dest = self.solver.destination(v, stir,begin_node)
+                        weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
+
+                        theta_limited = self.limit_by_theta(trajectory[2][-1], end_node[2],self.theta_diff_after)
+                        # limit_good = any(self.limit_by_distance(x, y, end_node[0], end_node[1]) for x,y,_ in zip(*trajectory))
+                        limit_good = self.limit_by_distance(end_node[0], end_node[1], trajectory[0][-1], trajectory[1][-1])
+
+                        if (limit_good and theta_limited and not (self.obstacles_trajectory_intersection(trajectory) ) ):
+                            edges.add((node_index, idx, v, stir, weight))
+
+
     def FindRoadMap(self, start_node, end_node, searchAlg='Dijkstra'):
-        self.nodes = np.concatenate((self.nodes, np.reshape(start_node, (1,3)), np.reshape(end_node, (1,3))), axis=0)
+        print("-- Finding Solution --")
+
+        #self.nodes = np.concatenate((self.nodes, np.reshape(start_node, (1,3)), np.reshape(end_node, (1,3))), axis=0)
         start_index = len(self.nodes) - 2
         end_index = len(self.nodes) - 1
 
-        tree = KDTree(self.nodes[:, :2])
         edges = set(self.edges)
 
-        self.generate_edges_curve_single_node(tree, edges, start_index, check_angle=True)
-        self.generate_edges_curve_single_node(tree, edges, end_index, check_angle=True)
 
-        #TODO maybe add multiple search functions
         if searchAlg == 'Dijkstra':
             shortest_path, _ = Dijkstra(self.nodes, edges, start_index, end_index)
         else:
@@ -155,10 +154,9 @@ class PRM:
     
 
     def plot(self):
-        plt.figure(figsize=(8, 8))
-        plt.quiver(self.nodes[:, 0], self.nodes[:, 1], np.cos(self.nodes[:, 2]), np.sin(self.nodes[:, 2]), scale=100, color='b', label='_Hidden label')
-
-        # plt.scatter(self.nodes[:, 0], self.nodes[:, 1], c=self.nodes[:, 2], cmap='hsv', label='Nodes')
+        f = plt.figure(figsize=(8, 8))
+        plt.quiver(self.nodes[:, 0], self.nodes[:, 1], np.cos(self.nodes[:, 2]), np.sin(self.nodes[:, 2]), 
+                   scale=100, width=0.002, color='b', label='_Hidden label')
 
         for edge in self.edges:
             node1 = self.nodes[edge[0]]
@@ -178,13 +176,49 @@ class PRM:
                 # plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red', alpha=1)
                 self.solver.plot_trajectory(v, phi, start_node)
 
+        # Plot start point
+        plt.quiver(self.nodes[-2, 0], self.nodes[-2, 1], np.cos(self.nodes[-2, 2]), np.sin(self.nodes[-2, 2]), 
+                   scale=100, width=0.002, color='g', label='Start')
+        # Plot end point
+        plt.quiver(self.nodes[-1, 0], self.nodes[-1, 1], np.cos(self.nodes[-1, 2]), np.sin(self.nodes[-1, 2]), 
+                   scale=100, width=0.002, color='g', label='End')
+
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.title('PRM')
         # plt.legend()
         plt.grid(True)
-        # plt.colorbar(label='Theta (radians)')
-        plt.show()
+
+        return f
+
+    def plotAsSingles(self):
+            if self.shortest_path is not None:
+                for i in range(np.size(self.shortest_path, axis=0)):
+                    start_node = self.shortest_path[i][0:3]
+                    goal_node = self.shortest_path[i][3:6]
+                    v = self.shortest_path[i][6]
+                    phi = self.shortest_path[i][7]
+                    plt.figure(figsize=(8, 8))
+                    
+                    plt.xlim(min(start_node[0], goal_node[0]) - 10, max(start_node[0], goal_node[0]) + 10)
+                    plt.ylim(min(start_node[1], goal_node[1]) - 10, max(start_node[1], goal_node[1]) + 10)
+
+                    plt.scatter(goal_node[0], goal_node[1], color='green', label='Goal', zorder=5)
+                    plt.scatter(start_node[0], start_node[1], color='green', label='Initial', zorder=5)
+                    self.solver.plot_trajectory(v, phi, start_node)
+                    plt.quiver(goal_node[0], goal_node[1], np.cos(goal_node[2]), np.sin(goal_node[2]), scale=10, color='b', label='_Hidden label')
+                    plt.quiver(start_node[0], start_node[1], np.cos(start_node[2]), np.sin(start_node[2]), scale=10, color='b', label='_Hidden label')
+                    
+
+            #plt.xlabel('X')
+            #plt.ylabel('Y')
+            #plt.title('PRM')
+            # plt.legend()
+            #plt.grid(True)
+            # plt.colorbar(label='Theta (radians)')
+            #plt.show()
+
+
 
 
 if __name__ == "__main__":
