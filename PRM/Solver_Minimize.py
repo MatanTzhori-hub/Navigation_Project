@@ -6,7 +6,7 @@ class TrajectoryOptimizer:
     def __init__(self, L=2.0, T=1, dt=0.01, distance_radius = 10):
         self.L = L  # Wheelbase
         self.T = T  # Time horizon
-        self.dt = dt  # Time step
+        self.dt = self.T / 100  # Time step
         self.max_iter = 100    
         self.distance_radius = distance_radius
 
@@ -33,7 +33,7 @@ class TrajectoryOptimizer:
         v, phi = u[0], u[1]
         cost = 0
         
-        if (v <= 0 or v > 15 or np.abs(phi) > np.pi / 3):
+        if (v <= 0 or v > 30 or np.abs(phi) > np.pi / 3):
             return 50000
         
         for _ in np.arange(0, self.T, self.dt):
@@ -47,7 +47,7 @@ class TrajectoryOptimizer:
         
         cost += x_diff**2 + y_diff**2 + theta_diff**2
 
-        return cost - v
+        return cost
 
     def solve(self, initial_state, goal_state, inital_guess=None):
         if inital_guess == None:

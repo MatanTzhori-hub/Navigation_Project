@@ -7,9 +7,10 @@ from .SearchAlgo import *
 from .Solver_Minimize import TrajectoryOptimizer
 
 class PRM:
-    def __init__(self, num_nodes, distance_radius, space_limits, start_point,end_point, obstacles_map=None, seed=None):
+    def __init__(self, num_nodes, distance_radius, space_limits, start_point,end_point,T=1,obstacles_map=None, seed=None):
         self.num_nodes = num_nodes
         self.distance_radius = distance_radius
+        self.T = T
         self.space_limits = space_limits
         self.obstacles = obstacles_map
         #limitation on road:
@@ -22,7 +23,7 @@ class PRM:
         self.end_point = end_point
 
         #solver's data:
-        self.solver = TrajectoryOptimizer(T=1, distance_radius=self.distance_radius)
+        self.solver = TrajectoryOptimizer(T=self.T, distance_radius=self.distance_radius)
         self.shortest_path = None
 
         self.nodes = self.generate_random_nodes(seed)
