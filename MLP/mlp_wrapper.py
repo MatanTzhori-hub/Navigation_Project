@@ -104,7 +104,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=True)
     
     epochs = 100
-    checkpoint = 'model_checkpoint'
+    checkpoint = 'checkpoints/model_checkpoint'
     early_stopping = 15
     print_every = 1
     
