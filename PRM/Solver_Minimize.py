@@ -18,7 +18,7 @@ class TrajectoryOptimizer:
         theta_f = theta_s + (v / self.L) * np.tan(phi) * self.T
         x_f = self.L/np.tan(phi)*(np.sin(theta_f)-np.sin(theta_s)) + x_s
         y_f = self.L/np.tan(phi)*(-np.cos(theta_f)+np.cos(theta_s)) + y_s
-        return x_f,y_f,theta_f
+        return x_f,y_f,theta_f % 2*np.pi
     
     # weight for edge as its distance
     def edge_road_weight(self, theta1, theta2, phi):

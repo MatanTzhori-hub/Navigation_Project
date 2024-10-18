@@ -41,6 +41,6 @@ date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
 plt.title(f"""Elapsed time: {t_end-t_start:.2f}\n 
             Number of Nodes: {prm.num_nodes}, Connect Radius: {prm.distance_radius}\n 
             Theta diff before: {prm.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm.theta_diff_after*(180/np.pi):.1f}""")
-f.savefig(f"fig/solution_{date}.png", dpi=500)
+f.savefig(f"figures/solution_{date}.png", dpi=500)
 
 #plt.show()

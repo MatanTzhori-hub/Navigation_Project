@@ -1,0 +1,36 @@
+import torch
+from torch.utils.data import Dataset, DataLoader, random_split
+import pandas
+import os
+
+
+def create_dataloaders(data_path: str = 'data', ratio=0.2, **dl_args):
+    """
+    :param data_path: path to the location of the dataset
+    :param ratio: the ratio to split to test
+    :param dl_args: arguments that will be passed to the dataloader (for example: batch_size=32 to change the batch size)
+    :return: DataLoaders for the train and test sets
+    """
+    train_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_train.csv'))
+    test_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_test.csv'))
+    train_dl = DataLoader(train_ds, **dl_args)
+    test_dl = DataLoader(test_ds, **dl_args)
+
+    return train_ds, train_dl, test_ds, test_dl
+
+
+class AckermanDataset(Dataset):
+    def __init__(self, data_path):
+        data = torch.from_numpy(pandas.read_csv(data_path).values)
+        self.X = data[:, 0:3]
+        self.y = data[:, 3:]
+
+    def __len__(self):
+        return self.X.size(0)
+
+    def __getitem__(self, item):
+        """
+        :param item: index of requested item
+        :return: the index and the item
+        """
+        return self.X[item], self.y[item]
