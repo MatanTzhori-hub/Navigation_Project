@@ -5,6 +5,7 @@ from shapely.geometry import LineString, Polygon, Point
 
 from .SearchAlgo import *
 from .Solver_Minimize import TrajectoryOptimizer
+from scripts import utils
 
 class PRM:
     def __init__(self, num_nodes, distance_radius, space_limits, start_point,end_point,obstacles_map=None, seed=None):
@@ -124,7 +125,7 @@ class PRM:
                     solution_limit = self.limit_by_velocity_stirring(v,stir)
                     if (solution_limit):
                         trajectory = self.solver.get_trajectory(v, stir, begin_node)
-                        dest = self.solver.destination(v, stir,begin_node)
+                        dest = utils.destination(self.solver.L, self.solver.T, v, stir,begin_node)
                         weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
 
                         theta_limited = self.limit_by_theta(trajectory[2][-1], end_node[2],self.theta_diff_after)

@@ -1,16 +1,7 @@
 import numpy as np
 import os.path
 
-def destination(L, T, v, phi, initial_state):
-        eps = 1e-5
-        phi = phi + eps 
-        x_s, y_s, theta_s = initial_state
-        theta_f = theta_s + (v / L) * np.tan(phi) * T
-        x_f = L/np.tan(phi)*(np.sin(theta_f)-np.sin(theta_s)) + x_s
-        y_f = L/np.tan(phi)*(-np.cos(theta_f)+np.cos(theta_s)) + y_s
-        
-        theta_f = theta_f % 2*np.pi
-        return x_f,y_f,theta_f
+import utils
     
 def point_diff(start, end):
         x, y, theta = start
@@ -23,12 +14,12 @@ def point_diff(start, end):
         return x_f,y_f,theta_f
     
 
-n_samples = 10000
+n_samples = 20
 ratio = 0.2
 titles = 'deltaX,deltaY,deltaTheta,Velocity,SteeringAngle,Time'
 filespath = 'dataset'
-train_file = 'AckermanDataset10K_train.csv'
-test_file = 'AckermanDataset10K_test.csv'
+train_file = 'overfitting_train.csv'
+test_file = 'overfitting_test.csv'
 
 max_delta = np.pi/4
 min_v = 5
@@ -49,7 +40,7 @@ delta = np.random.uniform(-max_delta, max_delta, size=n_samples)
 T = np.random.uniform(min_T, max_T, size=n_samples)
 
 for i in range(n_samples):
-    goal = destination(L, T[i], v[i], delta[i], start)
+    goal = utils.destination(L, T[i], v[i], delta[i], start)
     goal = np.array(goal)
     
     diff = point_diff(start, goal)

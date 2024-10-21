@@ -1,16 +1,17 @@
 import os
 import abc
 import sys
+import numpy as np
 import torch
 import torch.nn as nn
 import tqdm.auto
 from torch import Tensor
-from typing import Any, Tuple, Callable, Optional, cast
+from typing import Any, Callable, Optional
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
-from train_results import FitResult, BatchResult, EpochResult
-
+from .train_results import FitResult, BatchResult, EpochResult
+from scripts import utils
 
 class Trainer(abc.ABC):
     """
@@ -38,7 +39,7 @@ class Trainer(abc.ABC):
         if self.device:
             model.to(self.device)
 
-    def inside_threshhold(self, res_pred, res, eps=0.5):
+    def destination_error(self, x, y_pred):
         """
         Checks that res_pred is inside the threshold of eps in comparison to res.
         :param res_pred: Models prediction
@@ -46,7 +47,14 @@ class Trainer(abc.ABC):
         :param eps: the threshold
         :return: Binary vector, 1 if sample is in the threshold, otherwise 0.
         """
-        return torch.sum((res_pred - res)**2, dim=1) < eps**2
+        L = 2
+        start = Tensor([0, 0, 0])
+        end = torch.stack(utils.destination(L, y_pred[:, 2], y_pred[:, 0], y_pred[:, 1], start), dim=1)
+
+        theta_diff_mean = torch.mean((x[:, 2] - end[:, 2]) % torch.pi) 
+        xy_mean = torch.mean(torch.sqrt(torch.sum(((x[:, 0:2] - end[:, 0:2])**2), axis=1)))
+
+        return xy_mean, theta_diff_mean
         
 
     def fit(
@@ -77,8 +85,8 @@ class Trainer(abc.ABC):
         actual_num_epochs = 0
         epochs_without_improvement = 0
 
-        train_loss, train_acc, test_loss, test_acc = [], [], [], []
-        best_accuracy = None
+        train_loss, train_xy_dist, train_theta_diff, test_loss, test_xy_dist, test_theta_diff = [], [], [], [], [], []
+        best_loss = None
 
         for epoch in range(num_epochs):
             verbose = False  # pass this to train/test_epoch.
@@ -88,41 +96,30 @@ class Trainer(abc.ABC):
                 verbose = True
             self._print(f"--- EPOCH {epoch+1}/{num_epochs} ---", verbose)
 
-            # TODO: Train & evaluate for one epoch
-            #  - Use the train/test_epoch methods.
-            #  - Save losses and accuracies in the lists above.
-            # ====== YOUR CODE: ======
             train_result = self.train_epoch(dl_train, **kw)
             test_result = self.test_epoch(dl_test, **kw)
             
-            train_loss.append((sum(train_result.losses) / len(train_result.losses)).item())
-            train_acc.append(train_result.accuracy.item())
-            test_loss.append((sum(test_result.losses) / len(test_result.losses)).item())
-            test_acc.append(test_result.accuracy.item())
-            # ========================
+            train_loss.append(sum(train_result.losses).item() / len(dl_train.dataset))
+            train_xy_dist.append(sum(train_result.distance_mean).item() / len(dl_train.dataset))
+            train_theta_diff.append(sum(train_result.theta_diff_mean).item() / len(dl_train.dataset))
+            
+            test_loss.append(sum(test_result.losses).item() / len(dl_test.dataset))
+            test_xy_dist.append(sum(test_result.distance_mean).item() / len(dl_test.dataset))
+            test_theta_diff.append(sum(test_result.theta_diff_mean).item() / len(dl_test.dataset))
 
-            # TODO:
-            #  - Optional: Implement early stopping. This is a very useful and
-            #    simple regularization technique that is highly recommended.
-            #  - Optional: Implement checkpoints. You can use the save_checkpoint
-            #    method on this class to save the model to the file specified by
-            #    the checkpoints argument.
-            if best_accuracy is None or test_result.accuracy > best_accuracy:
-                # ====== YOUR CODE: ======
-                best_accuracy = test_result.accuracy
+            
+            if best_loss is None or test_result.losses < best_loss:
+                best_loss = test_result.losses
                 epochs_without_improvement = 0
                 
                 if checkpoints is not None:
                     self.save_checkpoint(checkpoints)
-                # ========================
             else:
-                # ====== YOUR CODE: ======
                 epochs_without_improvement += 1
                 if(early_stopping is not None and epochs_without_improvement >= early_stopping):
                     break
-                # ========================
 
-        return FitResult(actual_num_epochs, train_loss, train_acc, test_loss, test_acc)
+        return FitResult(actual_num_epochs, train_loss=train_loss, train_xy_dist=train_xy_dist, train_theta_diff=train_theta_diff, test_loss=test_loss, test_xy_dist=test_xy_dist, test_theta_diff=test_theta_diff)
 
     def save_checkpoint(self, checkpoint_filename: str):
         """
@@ -196,6 +193,9 @@ class Trainer(abc.ABC):
         dataloader, and prints progress along the way.
         """
         losses = []
+        theta_diff_mean = []
+        distance_mean = []
+
         num_correct = 0
         num_samples = len(dl.sampler)
         num_batches = len(dl.batch_sampler)
@@ -222,21 +222,27 @@ class Trainer(abc.ABC):
                 pbar.set_description(f"{pbar_name} ({batch_res.loss:.3f})")
                 pbar.update()
 
-                losses.append(batch_res.loss)
-                num_correct += batch_res.num_correct
+                d = dl.batch_size
+                losses.append(batch_res.loss * dl.batch_size)
+                theta_diff_mean.append(batch_res.theta_diff_mean * dl.batch_size)
+                distance_mean.append(batch_res.distance_mean * dl.batch_size)
 
-            avg_loss = sum(losses) / num_batches
-            accuracy = 100.0 * num_correct / num_samples
+            l = len(dl.dataset)
+            avg_loss = sum(losses) / len(dl.dataset)
+            avg_theta_diff = sum(theta_diff_mean) / len(dl.dataset)
+            avg_distance = sum(distance_mean) / len(dl.dataset)
+            
             pbar.set_description(
                 f"{pbar_name} "
                 f"(Avg. Loss {avg_loss:.3f}, "
-                f"Accuracy {accuracy:.1f})"
+                f"Avg. Theta diff {avg_theta_diff:.2f}, "
+                f"Avg. Distance {avg_distance:.2f})"
             )
 
         if not verbose:
             pbar_file.close()
 
-        return EpochResult(losses=losses, accuracy=accuracy)
+        return EpochResult(losses=losses, theta_diff_mean=theta_diff_mean, distance_mean=distance_mean)
 
 
 class LayerTrainer(Trainer):
@@ -264,10 +270,10 @@ class LayerTrainer(Trainer):
         batch_loss.backward()
         self.optimizer.step()
 
-        num_correct = torch.sum(self.inside_threshhold(out, y))
+        xy_dist, theta_error = self.destination_error(X, out)
         # ========================
 
-        return BatchResult(batch_loss, num_correct)
+        return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)
 
     def test_batch(self, batch) -> BatchResult:
         X, y = batch
@@ -277,7 +283,8 @@ class LayerTrainer(Trainer):
         # X = torch.reshape(X, (X.shape[0], -1))
         out = self.model.forward(X)
         batch_loss = self.loss_fn(out, y)
-        num_correct = torch.sum(self.inside_threshhold(out, y))
+
+        xy_dist, theta_error = self.destination_error(X, out)
         # ========================
 
-        return BatchResult(batch_loss, num_correct)
+        return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)

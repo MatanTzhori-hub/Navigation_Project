@@ -3,11 +3,11 @@ import numpy as np
 import itertools
 import matplotlib.pyplot as plt
 
-import mlp
-import training
-import dataset_load
+from MLP import mlp
+from MLP import training
+from MLP.training import FitResult
+from MLP import dataset_load
 
-from train_results import FitResult
 
 def plot_fit(
     fit_res: FitResult,
@@ -29,7 +29,7 @@ def plot_fit(
     """
     if fig is None:
         nrows = 1 if train_test_overlay else 2
-        ncols = 2
+        ncols = 3
         fig, axes = plt.subplots(
             nrows=nrows,
             ncols=ncols,
@@ -47,26 +47,30 @@ def plot_fit(
             if line.get_label() == legend:
                 line.remove()
 
-    p = itertools.product(enumerate(["train", "test"]), enumerate(["loss", "acc"]))
-    for (i, traintest), (j, lossacc) in p:
+    p = itertools.product(enumerate(["train", "test"]), enumerate(["loss", "xy_dist", "theta_diff"]))
+    for (i, traintest), (j, loss_avg) in p:
 
-        ax = axes[j if train_test_overlay else i * 2 + j]
+        ax = axes[j if train_test_overlay else i * 3 + j]
 
-        attr = f"{traintest}_{lossacc}"
+        attr = f"{traintest}_{loss_avg}"
         data = getattr(fit_res, attr)
         label = traintest if train_test_overlay else legend
         h = ax.plot(np.arange(1, len(data) + 1), data, label=label)
         ax.set_title(attr)
 
-        if lossacc == "loss":
+        if loss_avg == "loss":
             ax.set_xlabel("Iteration #")
             ax.set_ylabel("Loss")
             if log_loss:
                 ax.set_yscale("log")
                 ax.set_ylabel("Loss (log)")
+        elif loss_avg == "xy_dist":
+            ax.set_xlabel("Epoch #")
+            ax.set_ylabel("XY Mean Distance Error")
         else:
             ax.set_xlabel("Epoch #")
-            ax.set_ylabel("Accuracy (%)")
+            ax.set_ylabel("Mean Theta Error")
+
 
         if legend or train_test_overlay:
             ax.legend()
@@ -76,18 +80,19 @@ def plot_fit(
 
 
 def main():
+    batch_size = 64
     path_to_ds = "dataset/"
-    dl_params = {'batch_size': 64, 'shuffle': True}
+    dl_params = {'batch_size': batch_size, 'shuffle': True}
     train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
     
     ## MLP params:
     in_dim = 3
-    dims = [100, 100, 100, 100, 3]
+    dims = [64, 64, 3]
     depth = len(dims)
     nonlinear = ["relu"] * depth
     
     ## Optimizer params:
-    leaning_rate = 0.003
+    leaning_rate = 0.05
     reg = 0
     
     model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
@@ -100,8 +105,8 @@ def main():
         'Poisson Loss': torch.nn.PoissonNLLLoss(),
     }
 
-    loss_fn = loss_functions['Huber Loss']
-    optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=True)
+    loss_fn = loss_functions['Mean Squared Error Loss']
+    optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
     
     epochs = 100
     checkpoint = 'checkpoints/model_checkpoint'

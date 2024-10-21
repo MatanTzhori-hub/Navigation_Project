@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
+from sklearn.preprocessing import StandardScaler
 import pandas
 import os
 
@@ -13,6 +14,8 @@ def create_dataloaders(data_path: str = 'data', ratio=0.2, **dl_args):
     """
     train_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_train.csv'))
     test_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_test.csv'))
+    # train_ds = AckermanDataset(os.path.join(data_path, 'overfitting_train.csv'))
+    # test_ds = AckermanDataset(os.path.join(data_path, 'overfitting_test.csv'))
     train_dl = DataLoader(train_ds, **dl_args)
     test_dl = DataLoader(test_ds, **dl_args)
 
@@ -22,8 +25,15 @@ def create_dataloaders(data_path: str = 'data', ratio=0.2, **dl_args):
 class AckermanDataset(Dataset):
     def __init__(self, data_path):
         data = torch.from_numpy(pandas.read_csv(data_path).values)
-        self.X = data[:, 0:3]
-        self.y = data[:, 3:]
+        X = data[:, 0:3]
+        y = data[:, 3:]
+
+        self.X = X
+        self.y = y
+        # self.X = StandardScaler().fit(X)
+        # self.y = StandardScaler().fit(y)
+        # self.X = torch.Tensor(self.X.transform(X)).to(torch.float64)
+        # self.y = torch.Tensor(self.y.transform(y)).to(torch.float64)
 
     def __len__(self):
         return self.X.size(0)
