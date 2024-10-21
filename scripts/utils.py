@@ -9,4 +9,4 @@ def destination(L, T, v, phi, initial_state):
     theta_f = theta_s + (v / L) * torch.tan(phi) * T
     x_f = L/torch.tan(phi)*(torch.sin(theta_f)-torch.sin(theta_s)) + x_s
     y_f = L/torch.tan(phi)*(-torch.cos(theta_f)+torch.cos(theta_s)) + y_s
-    return x_f,y_f,theta_f % 2*torch.pi
+    return x_f,y_f,theta_f

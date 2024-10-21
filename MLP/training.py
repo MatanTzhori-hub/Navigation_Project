@@ -51,7 +51,7 @@ class Trainer(abc.ABC):
         start = Tensor([0, 0, 0])
         end = torch.stack(utils.destination(L, y_pred[:, 2], y_pred[:, 0], y_pred[:, 1], start), dim=1)
 
-        theta_diff_mean = torch.mean((x[:, 2] - end[:, 2]) % torch.pi) 
+        theta_diff_mean = torch.mean(torch.abs(x[:, 2] - end[:, 2]))
         xy_mean = torch.mean(torch.sqrt(torch.sum(((x[:, 0:2] - end[:, 0:2])**2), axis=1)))
 
         return xy_mean, theta_diff_mean
@@ -247,23 +247,13 @@ class Trainer(abc.ABC):
 
 class LayerTrainer(Trainer):
     def __init__(self, model, loss_fn, optimizer):
-        # ====== YOUR CODE: ======
         super().__init__(model)
         self.loss_fn = loss_fn
         self.optimizer = optimizer
-        # ========================
 
     def train_batch(self, batch) -> BatchResult:
         X, y = batch
 
-        # TODO: Train the Layer model on one batch of data.
-        #  - Forward pass
-        #  - Backward pass
-        #  - Optimize params
-        #  - Calculate number of correct predictions (make sure it's an int,
-        #    not a tensor) as num_correct.
-        # ====== YOUR CODE: ======
-        # X = torch.reshape(X, (X.shape[0], -1))
         out = self.model.forward(X)
         batch_loss = self.loss_fn(out, y)
         self.optimizer.zero_grad()
@@ -271,20 +261,15 @@ class LayerTrainer(Trainer):
         self.optimizer.step()
 
         xy_dist, theta_error = self.destination_error(X, out)
-        # ========================
 
         return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)
 
     def test_batch(self, batch) -> BatchResult:
         X, y = batch
-
-        # TODO: Evaluate the Layer model on one batch of data.
-        # ====== YOUR CODE: ======
-        # X = torch.reshape(X, (X.shape[0], -1))
+        
         out = self.model.forward(X)
         batch_loss = self.loss_fn(out, y)
 
         xy_dist, theta_error = self.destination_error(X, out)
-        # ========================
 
         return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)

@@ -26,7 +26,7 @@ def plot_trajectory(v_optimal, phi_optimal, initial_state, T, dt, L, color):
 
 # Initialize starting state
 start = [0, 0, 0]
-filename = 'dataset/AckermanDataset10K_train.csv'
+filename = 'dataset/BigDS_Filttered.csv'
 data = np.genfromtxt(filename, delimiter=',', skip_header=1)
 
 rows = data.shape[0]

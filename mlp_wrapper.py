@@ -15,6 +15,7 @@ def plot_fit(
     log_loss=False,
     legend=None,
     train_test_overlay: bool = False,
+    title=""
 ):
     """
     Plots a FitResult object.
@@ -76,6 +77,7 @@ def plot_fit(
             ax.legend()
         ax.grid(True)
 
+    plt.suptitle(title)
     return fig, axes
 
 
@@ -85,40 +87,42 @@ def main():
     dl_params = {'batch_size': batch_size, 'shuffle': True}
     train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
     
-    ## MLP params:
-    in_dim = 3
-    dims = [64, 64, 3]
-    depth = len(dims)
-    nonlinear = ["relu"] * depth
+    hidden_dims = [32, 64, 128]
     
-    ## Optimizer params:
-    leaning_rate = 0.05
-    reg = 0
-    
-    model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
-    model = model.double()
-    ## List of regression loss functions
-    loss_functions = {
-        'Mean Squared Error Loss': torch.nn.MSELoss(),
-        'Mean Absolute Error Loss': torch.nn.L1Loss(),
-        'Huber Loss': torch.nn.SmoothL1Loss(),
-        'Poisson Loss': torch.nn.PoissonNLLLoss(),
-    }
+    for i, dim in enumerate(hidden_dims):
+        for j in range(1,4):
+            ## MLP params:
+            in_dim = 3
+            out_dim = 3
+            
+            dims = [dim] * j + [out_dim]
+            depth = len(dims)
+            nonlinear = ["relu"] * depth
+            
+            ## Optimizer params:
+            leaning_rate = 0.005
+            reg = 0
+            
+            model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
+            model = model.double()
 
-    loss_fn = loss_functions['Mean Squared Error Loss']
-    optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
-    
-    epochs = 100
-    checkpoint = 'checkpoints/model_checkpoint'
-    early_stopping = 15
-    print_every = 1
-    
-    trainer = training.LayerTrainer(model, loss_fn, optimizer)
-    fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
-                          early_stopping=early_stopping, print_every=print_every)
-    
-    fig, ax = plot_fit(fit_res)
-    plt.show()
-    
+            loss_fn = torch.nn.MSELoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
+            
+            epochs = 100
+            checkpoint = f'checkpoints/model_checkpoint_{[in_dim] + dims}'
+            early_stopping = 25
+            print_every = 1
+            
+            trainer = training.LayerTrainer(model, loss_fn, optimizer)
+            fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
+                                early_stopping=early_stopping, print_every=print_every)
+            
+            
+            fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
+            plt.savefig(f"figures/MLP_HyperParams/{[in_dim] + dims}.png")
+            # plt.show()
+        
 if __name__ == "__main__":
     main()
+    

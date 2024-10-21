@@ -41,6 +41,6 @@ class AckermanDataset(Dataset):
     def __getitem__(self, item):
         """
         :param item: index of requested item
-        :return: the index and the item
+        :return: the item and the label
         """
         return self.X[item], self.y[item]
