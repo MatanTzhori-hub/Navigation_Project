@@ -12,10 +12,10 @@ def create_dataloaders(data_path: str = 'data', ratio=0.2, **dl_args):
     :param dl_args: arguments that will be passed to the dataloader (for example: batch_size=32 to change the batch size)
     :return: DataLoaders for the train and test sets
     """
-    train_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_train.csv'))
-    test_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_test.csv'))
-    # train_ds = AckermanDataset(os.path.join(data_path, 'overfitting_train.csv'))
-    # test_ds = AckermanDataset(os.path.join(data_path, 'overfitting_test.csv'))
+    #train_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_train.csv'))
+    #test_ds = AckermanDataset(os.path.join(data_path, 'AckermanDataset10K_test.csv'))
+    train_ds = AckermanDataset(os.path.join(data_path, 'overfitting_train.csv'))
+    test_ds = AckermanDataset(os.path.join(data_path, 'overfitting_test.csv'))
     train_dl = DataLoader(train_ds, **dl_args)
     test_dl = DataLoader(test_ds, **dl_args)
 

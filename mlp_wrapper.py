@@ -87,10 +87,13 @@ def main():
     dl_params = {'batch_size': batch_size, 'shuffle': True}
     train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
     
-    hidden_dims = [32, 64, 128]
     
+
+
+    #hidden_dims = [32, 64, 128]
+    hidden_dims = [3]
     for i, dim in enumerate(hidden_dims):
-        for j in range(1,4):
+        for j in range(1,2):
             ## MLP params:
             in_dim = 3
             out_dim = 3
@@ -100,7 +103,7 @@ def main():
             nonlinear = ["relu"] * depth
             
             ## Optimizer params:
-            leaning_rate = 0.005
+            leaning_rate = 0.01
             reg = 0
             
             model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
@@ -109,7 +112,7 @@ def main():
             loss_fn = torch.nn.MSELoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
             
-            epochs = 100
+            epochs = 10000
             checkpoint = f'checkpoints/model_checkpoint_{[in_dim] + dims}'
             early_stopping = 25
             print_every = 1
