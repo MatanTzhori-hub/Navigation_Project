@@ -82,7 +82,7 @@ def plot_fit(
 
 
 def main():
-    batch_size = 64
+    batch_size = 512
     path_to_ds = "dataset/"
     dl_params = {'batch_size': batch_size, 'shuffle': True}
     train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
@@ -91,9 +91,9 @@ def main():
 
 
     #hidden_dims = [32, 64, 128]
-    hidden_dims = [3]
+    hidden_dims = [256]
     for i, dim in enumerate(hidden_dims):
-        for j in range(1,2):
+        for j in range(4,5):
             ## MLP params:
             in_dim = 3
             out_dim = 3
@@ -103,21 +103,23 @@ def main():
             nonlinear = ["relu"] * depth
             
             ## Optimizer params:
-            leaning_rate = 0.01
+            leaning_rate = 0.005
             reg = 0
             
             model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
             model = model.double()
+            print(model)
 
             loss_fn = torch.nn.MSELoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
             
-            epochs = 10000
+            epochs = 500
             checkpoint = f'checkpoints/model_checkpoint_{[in_dim] + dims}'
-            early_stopping = 25
+            early_stopping = 300
             print_every = 1
             
-            trainer = training.LayerTrainer(model, loss_fn, optimizer)
+            trainer = training.Trainer(model, loss_fn, optimizer, scheduler)
             fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
                                 early_stopping=early_stopping, print_every=print_every)
             

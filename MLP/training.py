@@ -26,6 +26,9 @@ class Trainer(abc.ABC):
     def __init__(
         self,
         model: nn.Module,
+        loss_fn,
+        optimizer,
+        scheduler=None,
         device: Optional[torch.device] = None,
     ):
         """
@@ -34,6 +37,9 @@ class Trainer(abc.ABC):
         :param device: torch.device to run training on (CPU or GPU).
         """
         self.model = model
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
 
         if self.device:
@@ -99,17 +105,19 @@ class Trainer(abc.ABC):
             train_result = self.train_epoch(dl_train, **kw)
             test_result = self.test_epoch(dl_test, **kw)
             
-            train_loss.append(sum(train_result.losses).item() / len(dl_train.dataset))
+            train_loss_epoch = sum(train_result.losses).item() / len(dl_train.dataset)
+            train_loss.append(train_loss_epoch)
             train_xy_dist.append(sum(train_result.distance_mean).item() / len(dl_train.dataset))
             train_theta_diff.append(sum(train_result.theta_diff_mean).item() / len(dl_train.dataset))
             
-            test_loss.append(sum(test_result.losses).item() / len(dl_test.dataset))
+            test_loss_epoch = sum(test_result.losses).item() / len(dl_test.dataset)
+            test_loss.append(test_loss_epoch)
             test_xy_dist.append(sum(test_result.distance_mean).item() / len(dl_test.dataset))
             test_theta_diff.append(sum(test_result.theta_diff_mean).item() / len(dl_test.dataset))
 
             
-            if best_loss is None or test_result.losses < best_loss:
-                best_loss = test_result.losses
+            if best_loss is None or train_result.losses < best_loss:
+                best_loss = train_result.losses
                 epochs_without_improvement = 0
                 
                 if checkpoints is not None:
@@ -118,6 +126,9 @@ class Trainer(abc.ABC):
                 epochs_without_improvement += 1
                 if(early_stopping is not None and epochs_without_improvement >= early_stopping):
                     break
+
+            if self.scheduler is not None:
+                self.scheduler.step(train_loss_epoch)
 
         return FitResult(actual_num_epochs, train_loss=train_loss, train_xy_dist=train_xy_dist, train_theta_diff=train_theta_diff, test_loss=test_loss, test_xy_dist=test_xy_dist, test_theta_diff=test_theta_diff)
 
@@ -150,30 +161,28 @@ class Trainer(abc.ABC):
         self.model.train(False)  # set evaluation (test) mode
         return self._foreach_batch(dl_test, self.test_batch, **kw)
 
-    @abc.abstractmethod
     def train_batch(self, batch) -> BatchResult:
-        """
-        Runs a single batch forward through the model, calculates loss,
-        preforms back-propagation and updates weights.
-        :param batch: A single batch of data  from a data loader (might
-            be a tuple of data and labels or anything else depending on
-            the underlying dataset.
-        :return: A BatchResult containing the value of the loss function and
-            the number of correctly classified samples in the batch.
-        """
-        raise NotImplementedError()
+        X, y = batch
 
-    @abc.abstractmethod
+        self.optimizer.zero_grad()
+        out = self.model.forward(X)
+        batch_loss = self.loss_fn(out, y)
+        batch_loss.backward()
+        self.optimizer.step()
+
+        xy_dist, theta_error = self.destination_error(X, out)
+
+        return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)
+
     def test_batch(self, batch) -> BatchResult:
-        """
-        Runs a single batch forward through the model and calculates loss.
-        :param batch: A single batch of data  from a data loader (might
-            be a tuple of data and labels or anything else depending on
-            the underlying dataset.
-        :return: A BatchResult containing the value of the loss function and
-            the number of correctly classified samples in the batch.
-        """
-        raise NotImplementedError()
+        X, y = batch
+        
+        out = self.model.forward(X)
+        batch_loss = self.loss_fn(out, y)
+
+        xy_dist, theta_error = self.destination_error(X, out)
+
+        return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)
 
     @staticmethod
     def _print(message, verbose=True):
@@ -244,32 +253,3 @@ class Trainer(abc.ABC):
 
         return EpochResult(losses=losses, theta_diff_mean=theta_diff_mean, distance_mean=distance_mean)
 
-
-class LayerTrainer(Trainer):
-    def __init__(self, model, loss_fn, optimizer):
-        super().__init__(model)
-        self.loss_fn = loss_fn
-        self.optimizer = optimizer
-
-    def train_batch(self, batch) -> BatchResult:
-        X, y = batch
-
-        out = self.model.forward(X)
-        batch_loss = self.loss_fn(out, y)
-        self.optimizer.zero_grad()
-        batch_loss.backward()
-        self.optimizer.step()
-
-        xy_dist, theta_error = self.destination_error(X, out)
-
-        return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)
-
-    def test_batch(self, batch) -> BatchResult:
-        X, y = batch
-        
-        out = self.model.forward(X)
-        batch_loss = self.loss_fn(out, y)
-
-        xy_dist, theta_error = self.destination_error(X, out)
-
-        return BatchResult(batch_loss, distance_mean=xy_dist ,theta_diff_mean=theta_error)

@@ -27,15 +27,15 @@ def plot_trajectory(v_optimal, phi_optimal, initial_state, T, dt, L, color, labe
                 scale=100, width=0.002, color=color, label=label)
     plt.plot(trajectory_x, trajectory_y, color=color)
 
-checkpoint_filename = "checkpoints/overfit_[3, 64, 3]"
-data_path = "dataset/overfitting_train.csv"
+checkpoint_filename = "checkpoints/model_checkpoint_[3, 256, 256, 256, 256, 3]"
+data_path = "dataset/AckermanDataset10K_test.csv"
 
 model = torch.load(checkpoint_filename)
 # print(model)
 
 data = torch.from_numpy(pandas.read_csv(data_path).values)
-x = data[:, 0:3]
-y = data[:, 3:].numpy()
+x = data[:25, 0:3]
+y = data[:25, 3:].numpy()
 
 # x = utils.destination(2, data[0, 5], data[0, 3], data[0, 4], torch.tensor([0,0,0]))
 
