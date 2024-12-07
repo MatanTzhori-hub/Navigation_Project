@@ -2,6 +2,7 @@ import torch
 from torch import Tensor, nn
 from typing import Union, Sequence
 from collections import defaultdict
+from sklearn.preprocessing import MinMaxScaler
 
 ACTIVATIONS = {
     "relu": nn.ReLU,
@@ -33,7 +34,7 @@ class MLP(nn.Module):
     """
 
     def __init__(
-        self, in_dim: int, dims: Sequence[int], nonlins: Sequence[Union[str, nn.Module]]
+        self, in_dim: int, dims: Sequence[int], nonlins: Sequence[Union[str, nn.Module]], norm=False
     ):
         """
         :param in_dim: Input dimension.
@@ -44,6 +45,8 @@ class MLP(nn.Module):
             dict, or instances of nn.Module (e.g. an instance of nn.ReLU()).
             Length should match 'dims'.
         """
+        self.norm = norm
+        
         assert len(nonlins) == len(dims)
         self.in_dim = in_dim
         self.out_dim = dims[-1]
@@ -53,11 +56,14 @@ class MLP(nn.Module):
         for i in range(len(dims) - 1):
             layers.append(nn.Linear(dims[i], dims[i + 1], bias=True))
             if i < len(dims) - 2:
+                # layers.append(nn.BatchNorm1d(dims[i + 1]))
                 if nonlins[i] in ACTIVATIONS:
                     layers.append(ACTIVATIONS[nonlins[i]](
                         **ACTIVATION_DEFAULT_KWARGS[nonlins[i]]))
                 else:
                     layers.append(nonlins[i])
+                # layers.append(nn.Dropout(p=0.03))
+
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -65,4 +71,7 @@ class MLP(nn.Module):
         :param x: An input tensor, of shape (N, D) containing N samples with D features.
         :return: An output tensor of shape (N, D_out) where D_out is the output dim.
         """
+        if self.norm:
+            scaler = MinMaxScaler().fit(x)
+            x = torch.Tensor(scaler.transform(x)).to(torch.float64)
         return self.layers(x)

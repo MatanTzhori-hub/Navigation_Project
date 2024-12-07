@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 from shapely.geometry import LineString, Polygon, Point
@@ -8,16 +9,18 @@ from .Solver_Minimize import TrajectoryOptimizer
 from scripts import utils
 
 class PRM:
-    def __init__(self, num_nodes, distance_radius, space_limits, start_point,end_point,obstacles_map=None, seed=None):
+    def __init__(self, num_nodes, distance_radius, space_limits, start_point, end_point, obstacles_map=None, seed=None, use_mlp=True):
         self.num_nodes = num_nodes
         self.distance_radius = distance_radius
         self.space_limits = space_limits
         self.obstacles = obstacles_map
+        self.use_mlp = use_mlp
+        
         #limitation on road:
         self.theta_diff_before = 135 * np.pi/180  # before finding solution
         self.theta_diff_after = 60 * np.pi/180   # after finding solution
         self.max_stirring = np.pi/2
-        self.max_dist_error =0.05 #in meter
+        self.max_dist_error = 0.05 #in meter
 
         self.start_point = start_point
         self.end_point = end_point
@@ -26,8 +29,14 @@ class PRM:
         self.solver = TrajectoryOptimizer(distance_radius=self.distance_radius)
         self.shortest_path = None
 
+        # MLP model
+        self.model = torch.load("experiments/Dataset_smaller_15__layers_256/model_[3, 256, 256, 256, 256, 3]")
+
         self.nodes = self.generate_random_nodes(seed)
-        self.edges = self.generate_edges()
+        if self.use_mlp:
+            self.edges = self.generate_edge_mlp()
+        else:
+            self.edges = self.generate_edges()
 
     def generate_random_nodes(self, seed=None):
         print("-- Generating Nodes --")
@@ -65,38 +74,109 @@ class PRM:
     #     return theta
         
 
-    def obstacles_line_intersection(self, node1, node2):
-        line = LineString([(node1[0], node1[1]), (node2[0], node2[1])])
-        for obstacle in self.obstacles:
-            if obstacle.intersects(line):
-                return True
-        return False
-    
     def obstacles_trajectory_intersection(self, trajectory: list):
-        for obstacle in self.obstacles:
-            for point in zip(trajectory[0][::10], trajectory[1][::10]):
-                if obstacle.intersects(Point(point)):
-                    return True
-        return False
+        x_traj, y_traj, _ = trajectory
+        intersects = np.zeros(len(x_traj), dtype=bool)
+        
+        for i in range(len(x_traj)):
+            line = LineString(np.column_stack((x_traj[i], y_traj[i])))
+            for obstacle in self.obstacles:
+                if obstacle.intersects(line):
+                    intersects[i] = True
+
+        return intersects
+        
+    
+    # def obstacles_trajectory_intersection(self, trajectory: list):
+    #     for obstacle in self.obstacles:
+    #         for point in zip(trajectory[0][::10], trajectory[1][::10]):
+    #             if obstacle.intersects(Point(point)):
+    #                 return True
+    #     return False
 
     def oclidian_distance(self, x1, y1, x2, y2):
         return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
     def limit_by_distance(self, x1, y1, x2, y2):
-        if ((x1 - x2)**2 + (y1 - y2)**2) < self.max_dist_error:
-            return True
-        return False
+        return ((x1 - x2)**2 + (y1 - y2)**2) < self.max_dist_error
     
     def limit_by_theta(self, theta1, theta2, theta_error):
-        if np.abs(theta1 - theta2) < theta_error:
-            return True
-        return False
+        return np.abs(theta1 - theta2) < theta_error
     
     def limit_by_velocity_stirring(self, v, stirring):
-        if ( v > 0 and np.abs(stirring) < self.max_stirring):
-            return True
-        return False
+        return ( (np.array(v) > 0) & (np.abs(np.array(stirring)) < self.max_stirring))
+    
+    def translate_rotate(self, start, goal):
+        start = np.array(start)
+        goal = np.array(goal)
+        
+        x_start, y_start, theta_start = start
+        x_goal, y_goal, theta_goal = goal.T
 
+        x_goal_translated = x_goal - x_start
+        y_goal_translated = y_goal - y_start
+        
+        R = np.array([[np.cos(-theta_start), -np.sin(-theta_start)],
+                  [np.sin(-theta_start), np.cos(-theta_start)]])
+
+        temp = np.array([x_goal_translated, y_goal_translated])
+        goal_rotated = np.dot(R, temp)
+        
+        return np.array([*goal_rotated, theta_goal - theta_start]).T
+
+
+    def generate_edge_mlp(self):
+        print("-- Generating Edges --")
+        
+        tree = KDTree(self.nodes[:, :2])  # KDTree for efficient nearest neighbor search
+        edges = set()  # Use set to ensure uniqueness
+        for begin_indx in range(self.num_nodes+2):
+            begin_node = self.nodes[begin_indx, :]
+            indices = np.array(tree.query_ball_point(self.nodes[begin_indx, :2], self.distance_radius), dtype=int)
+            indices = indices[indices != begin_indx]
+            if len(indices) == 0: continue
+            neighbors = self.nodes[indices, :]
+            
+            theta_limited_before = self.limit_by_theta(begin_node[2], neighbors[:, 2], self.theta_diff_before)
+            indices = indices[theta_limited_before]
+            if len(indices) == 0: continue
+            neighbors = self.nodes[indices, :]
+            
+            deltas = self.translate_rotate(begin_node, neighbors)
+            y = self.model(torch.tensor(deltas))
+            v, stir, T = np.array(y.T.squeeze().tolist())
+            
+            solution_limit = self.limit_by_velocity_stirring(v, stir)
+            indices = indices[solution_limit]
+            if len(indices) == 0: continue
+            neighbors = self.nodes[indices, :]
+            v, stir, T = v[solution_limit], stir[solution_limit], T[solution_limit]
+            
+            trajectory = self.solver.get_trajectory(v, stir, T, begin_node)
+            
+            theta_limited_after = self.limit_by_theta(trajectory[2][:, -1], neighbors[:, 2], self.theta_diff_after)
+            limit_dist = self.limit_by_distance(neighbors[:, 0], neighbors[:, 1], trajectory[0][:, -1], trajectory[1][:, -1])
+            filter = theta_limited_after & limit_dist
+            indices = indices[filter]
+            if len(indices) == 0: continue
+            trajectory = (trajectory[0][filter, :], trajectory[1][filter, :], trajectory[2][filter, :])
+            neighbors = self.nodes[indices, :]
+            v, stir, T = v[filter], stir[filter], T[filter]
+            
+            object_intersects = self.obstacles_trajectory_intersection(trajectory)
+            indices = indices[~object_intersects]
+            if len(indices) == 0: continue
+            trajectory = (trajectory[0][~object_intersects, :], trajectory[1][~object_intersects, :], trajectory[2][~object_intersects, :])
+            neighbors = self.nodes[indices, :]
+            v, stir, T = v[~object_intersects], stir[~object_intersects], T[~object_intersects]
+            
+            dest = utils.destination(self.solver.L, T, v, stir, begin_node)
+            weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
+            
+            for j in range(len(indices)):
+                edges.add((begin_indx, indices[j], v[j], stir[j], weight[j], T[j]))
+          
+        return edges  
 
     def generate_edges(self):
         print("-- Generating Edges --")
@@ -105,10 +185,10 @@ class PRM:
         edges = set()  # Use set to ensure uniqueness
         for i in range(self.num_nodes+2):
             self.generate_edges_curve_single_node(tree, edges, i)     
-        return list(edges)
+        return edges
 
     #generate all solutions between node_index to all neighbors within distance_radius
-    def generate_edges_curve_single_node(self, tree, edges, node_index):
+    def generate_edges_curve_single_node(self, tree: KDTree, edges: set, node_index: int):
         indices = tree.query_ball_point(self.nodes[node_index, :2], self.distance_radius)
         for idx in indices:
             if node_index != idx:
@@ -118,32 +198,39 @@ class PRM:
                 if (T_calc >8): T_calc =8
                 if (T_calc<1): T_calc = 1
                 self.solver.T = T_calc
+                self.solver.dt = T_calc / 100
                 
                 theta_limited = self.limit_by_theta(begin_node[2], end_node[2],self.theta_diff_before)
                 if ( theta_limited ):
                     v, stir = self.solver.solve(begin_node, end_node)
+                    
+                    # x = torch.tensor(self.translate_rotate(begin_node, end_node)).reshape(1, 3)
+                    # y = self.model(x)
+                    # v, stir, self.solver.T = y.squeeze().tolist()
+                    self.solver.dt = self.solver.T / 100
+                    
                     solution_limit = self.limit_by_velocity_stirring(v,stir)
                     if (solution_limit):
-                        trajectory = self.solver.get_trajectory(v, stir, begin_node)
-                        dest = utils.destination(self.solver.L, self.solver.T, v, stir,begin_node)
+                        trajectory = self.solver.get_trajectory(v, stir, self.solver.T, begin_node)
+                        dest = utils.destination(self.solver.L, self.solver.T, v, stir, begin_node)
                         weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
 
-                        theta_limited = self.limit_by_theta(trajectory[2][-1], end_node[2],self.theta_diff_after)
+                        theta_limited = self.limit_by_theta(trajectory[2][0, -1], end_node[2],self.theta_diff_after)
                         # limit_good = any(self.limit_by_distance(x, y, end_node[0], end_node[1]) for x,y,_ in zip(*trajectory))
-                        limit_good = self.limit_by_distance(end_node[0], end_node[1], trajectory[0][-1], trajectory[1][-1])
+                        limit_good = self.limit_by_distance(end_node[0], end_node[1], trajectory[0][0, -1], trajectory[1][0, -1])
 
                         if (limit_good and theta_limited and not (self.obstacles_trajectory_intersection(trajectory) ) ):
                             edges.add((node_index, idx, v, stir, weight, self.solver.T))
 
 
-    def FindRoadMap(self, start_node, end_node, searchAlg='Dijkstra'):
+    def FindRoadMap(self, searchAlg='Dijkstra'):
         print("-- Finding Solution --")
 
         #self.nodes = np.concatenate((self.nodes, np.reshape(start_node, (1,3)), np.reshape(end_node, (1,3))), axis=0)
         start_index = len(self.nodes) - 2
         end_index = len(self.nodes) - 1
 
-        edges = set(self.edges)
+        edges = self.edges
 
 
         if searchAlg == 'Dijkstra':
@@ -182,8 +269,8 @@ class PRM:
                 v = self.shortest_path[i][6]
                 phi = self.shortest_path[i][7]
                 # plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red', alpha=1)
-                self.solver.T = self.shortest_path[i][9]
-                self.solver.plot_trajectory(v, phi, start_node)
+                T = self.shortest_path[i][9]
+                self.solver.plot_trajectory(v, phi, T, start_node)
 
         # Plot start point
         plt.quiver(self.nodes[-2, 0], self.nodes[-2, 1], np.cos(self.nodes[-2, 2]), np.sin(self.nodes[-2, 2]), 

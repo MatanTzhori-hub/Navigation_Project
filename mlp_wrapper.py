@@ -2,11 +2,14 @@ import torch
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
+from torch.utils.tensorboard import SummaryWriter
 
 from MLP import mlp
 from MLP import training
 from MLP.training import FitResult
 from MLP import dataset_load
+
+import datetime
 
 
 def plot_fit(
@@ -82,18 +85,20 @@ def plot_fit(
 
 
 def main():
-    batch_size = 512
-    path_to_ds = "dataset/"
+    logdir = "logs"
+    writer = SummaryWriter(logdir)
+    
+    normalize = False
+    batch_size = 2500
+    path_to_ds = "dataset/AckermanDataset100K"
     dl_params = {'batch_size': batch_size, 'shuffle': True}
     train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
     
-    
-
 
     #hidden_dims = [32, 64, 128]
-    hidden_dims = [256]
+    hidden_dims = [64]
     for i, dim in enumerate(hidden_dims):
-        for j in range(4,5):
+        for j in range(3, 4):
             ## MLP params:
             in_dim = 3
             out_dim = 3
@@ -106,26 +111,30 @@ def main():
             leaning_rate = 0.005
             reg = 0
             
-            model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
+            model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear, norm=normalize)
             model = model.double()
             print(model)
 
             loss_fn = torch.nn.MSELoss()
             optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
+            # scheduler= None
             
             epochs = 500
-            checkpoint = f'checkpoints/model_checkpoint_{[in_dim] + dims}'
-            early_stopping = 300
-            print_every = 1
+            checkpoint = f'checkpoints/model_{[in_dim] + dims}'
+            checkpoint = checkpoint + '_norm' if normalize else checkpoint
+            early_stopping = 100
+            print_every = 10
             
-            trainer = training.Trainer(model, loss_fn, optimizer, scheduler)
+            trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
             fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
                                 early_stopping=early_stopping, print_every=print_every)
             
             
             fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
-            plt.savefig(f"figures/MLP_HyperParams/{[in_dim] + dims}.png")
+            
+            date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
+            plt.savefig(f"figures/MLP_Training/{[in_dim] + dims}__{date}.png")
             # plt.show()
         
 if __name__ == "__main__":

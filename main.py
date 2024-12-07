@@ -29,8 +29,8 @@ start_point = [10,10,0]
 end_point = [90,90,0]
 
 t_start =  time.time()
-prm = PRM(num_nodes, distance_radius, space_limits,start_point,end_point, map_5, seed)
-prm.FindRoadMap(start_point, end_point, 'Dijkstra')
+prm = PRM(num_nodes, distance_radius, space_limits,start_point,end_point, map_5, seed=seed, use_mlp=True)
+prm.FindRoadMap('Dijkstra')
 t_end =  time.time()
 
 f = prm.plot()

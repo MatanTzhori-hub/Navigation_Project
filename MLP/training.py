@@ -4,11 +4,13 @@ import sys
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.utils
 import tqdm.auto
 from torch import Tensor
 from typing import Any, Callable, Optional
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from .train_results import FitResult, BatchResult, EpochResult
 from scripts import utils
@@ -29,6 +31,7 @@ class Trainer(abc.ABC):
         loss_fn,
         optimizer,
         scheduler=None,
+        writer: SummaryWriter=None,
         device: Optional[torch.device] = None,
     ):
         """
@@ -40,6 +43,7 @@ class Trainer(abc.ABC):
         self.loss_fn = loss_fn
         self.optimizer = optimizer
         self.scheduler = scheduler
+        self.writer = writer
         self.device = device
 
         if self.device:
@@ -53,12 +57,14 @@ class Trainer(abc.ABC):
         :param eps: the threshold
         :return: Binary vector, 1 if sample is in the threshold, otherwise 0.
         """
+        x = x.detach().numpy()
+        y_pred = y_pred.detach().numpy()
         L = 2
-        start = Tensor([0, 0, 0])
-        end = torch.stack(utils.destination(L, y_pred[:, 2], y_pred[:, 0], y_pred[:, 1], start), dim=1)
+        start = np.array([0, 0, 0])
+        end = np.stack(utils.destination(L, y_pred[:, 2], y_pred[:, 0], y_pred[:, 1], start), axis=1)
 
-        theta_diff_mean = torch.mean(torch.abs(x[:, 2] - end[:, 2]))
-        xy_mean = torch.mean(torch.sqrt(torch.sum(((x[:, 0:2] - end[:, 0:2])**2), axis=1)))
+        theta_diff_mean = np.mean(np.abs(x[:, 2] - end[:, 2]))
+        xy_mean = np.mean(np.sqrt(np.sum(((x[:, 0:2] - end[:, 0:2])**2), axis=1)))
 
         return xy_mean, theta_diff_mean
         
@@ -106,18 +112,26 @@ class Trainer(abc.ABC):
             test_result = self.test_epoch(dl_test, **kw)
             
             train_loss_epoch = sum(train_result.losses).item() / len(dl_train.dataset)
+            train_xy_dist_epoch = sum(train_result.distance_mean).item() / len(dl_train.dataset)
+            train_theta_diff_epoch = sum(train_result.theta_diff_mean).item() / len(dl_train.dataset)
             train_loss.append(train_loss_epoch)
-            train_xy_dist.append(sum(train_result.distance_mean).item() / len(dl_train.dataset))
-            train_theta_diff.append(sum(train_result.theta_diff_mean).item() / len(dl_train.dataset))
+            train_xy_dist.append(train_xy_dist_epoch)
+            train_theta_diff.append(train_theta_diff_epoch)
             
             test_loss_epoch = sum(test_result.losses).item() / len(dl_test.dataset)
+            test_xy_dist_epoch = sum(test_result.distance_mean).item() / len(dl_test.dataset)
+            test_theta_diff_epoch = sum(test_result.theta_diff_mean).item() / len(dl_test.dataset)
             test_loss.append(test_loss_epoch)
-            test_xy_dist.append(sum(test_result.distance_mean).item() / len(dl_test.dataset))
-            test_theta_diff.append(sum(test_result.theta_diff_mean).item() / len(dl_test.dataset))
+            test_xy_dist.append(test_xy_dist_epoch)
+            test_theta_diff.append(test_theta_diff_epoch)
 
+            if self.writer:
+                self.writer.add_scalars('Loss', {'train': train_loss_epoch, 'test': test_loss_epoch}, epoch)
+                self.writer.add_scalars('XY_Distance', {'train': train_xy_dist_epoch, 'test': test_xy_dist_epoch}, epoch)
+                self.writer.add_scalars('Theta_Difference', {'train': train_theta_diff_epoch, 'test': test_theta_diff_epoch}, epoch)
             
-            if best_loss is None or train_result.losses < best_loss:
-                best_loss = train_result.losses
+            if best_loss is None or train_loss_epoch < best_loss:
+                best_loss = train_loss_epoch
                 epochs_without_improvement = 0
                 
                 if checkpoints is not None:
