@@ -89,53 +89,56 @@ def main():
     writer = SummaryWriter(logdir)
     
     normalize = False
-    batch_size = 2500
-    path_to_ds = "dataset/AckermanDataset100K"
-    dl_params = {'batch_size': batch_size, 'shuffle': True}
-    train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
-    
+    batch_sizes = [250, 500, 1000, 2000]
+    datasets = [10, 30, 50, 70, 100]
 
     #hidden_dims = [32, 64, 128]
-    hidden_dims = [64]
+    hidden_dims = [32, 64, 128]
     for i, dim in enumerate(hidden_dims):
-        for j in range(3, 4):
-            ## MLP params:
-            in_dim = 3
-            out_dim = 3
-            
-            dims = [dim] * j + [out_dim]
-            depth = len(dims)
-            nonlinear = ["relu"] * depth
-            
-            ## Optimizer params:
-            leaning_rate = 0.005
-            reg = 0
-            
-            model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear, norm=normalize)
-            model = model.double()
-            print(model)
+        for j in range(1, 4):
+            for batch_size in batch_sizes:
+                for ds_size in datasets:
+                    path_to_ds = f"dataset/Below_15/AckermanDataset{ds_size}K"
+                    dl_params = {'batch_size': batch_size, 'shuffle': True}
+                    train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
+                    
+                    ## MLP params:
+                    in_dim = 3
+                    out_dim = 3
+                    
+                    dims = [dim] * j + [out_dim]
+                    depth = len(dims)
+                    nonlinear = ["relu"] * depth
+                    
+                    ## Optimizer params:
+                    leaning_rate = 0.005
+                    reg = 0
+                    
+                    model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear, norm=normalize)
+                    model = model.double()
+                    print(model)
 
-            loss_fn = torch.nn.MSELoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
-            # scheduler= None
-            
-            epochs = 500
-            checkpoint = f'checkpoints/model_{[in_dim] + dims}'
-            checkpoint = checkpoint + '_norm' if normalize else checkpoint
-            early_stopping = 100
-            print_every = 10
-            
-            trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
-            fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
-                                early_stopping=early_stopping, print_every=print_every)
-            
-            
-            fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
-            
-            date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-            plt.savefig(f"figures/MLP_Training/{[in_dim] + dims}__{date}.png")
-            # plt.show()
+                    loss_fn = torch.nn.MSELoss()
+                    optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
+                    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
+                    # scheduler= None
+                    
+                    epochs = 500
+                    checkpoint = f'checkpoints/model_{[in_dim] + dims}'
+                    checkpoint = checkpoint + '_norm' if normalize else checkpoint
+                    early_stopping = 100
+                    print_every = 10
+                    
+                    trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
+                    fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
+                                        early_stopping=early_stopping, print_every=print_every)
+                    
+                    
+                    fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
+                    
+                    date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
+                    plt.savefig(f"figures/MLP_Training/{[in_dim] + dims}__{batch_size}__{ds_size}__{date}.png")
+                    # plt.show()
         
 if __name__ == "__main__":
     main()

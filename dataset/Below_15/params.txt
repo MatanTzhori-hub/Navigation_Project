@@ -1,0 +1,7 @@
+-pi/4 < stirring < pi/4
+5 < velocity < 10
+0.1 < Time < 3.5
+
+L = 2
+
+filtered out any sample that does more than half a circle, and any sample that is further than 15

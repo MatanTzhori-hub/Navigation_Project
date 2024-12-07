@@ -88,7 +88,6 @@ dataset = dataset[filter_idxs]
 # Filter samples with distance smaller than 15
 filter_idxs = (15 > np.sqrt(dataset[:, 0]**2 + dataset[:, 1]**2))
 dataset = dataset[filter_idxs]
-np.savetxt("dataset/BigDS_Filttered.csv", dataset, delimiter=',', header=titles, comments='', fmt='%.6f')
 
 # save only n_samples
 dataset = dataset[0:n_samples, :]
