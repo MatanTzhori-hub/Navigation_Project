@@ -30,7 +30,7 @@ def plot_trajectory(v_optimal, phi_optimal, initial_state, T, L, color, label=No
                 scale=100, width=0.002, color=color, label=label)
     plt.plot(trajectory_x, trajectory_y, color=color)
 
-checkpoint_filename = "checkpoints/model_[3, 64, 64, 64, 3]"
+checkpoint_filename = "checkpoints/[3, 128, 128, 128, 3]__2000__100__12_08_14_23_49"
 data_path = "dataset/AckermanDataset10K_test.csv"
 # data_path = "dataset/overfitting_train.csv"
 

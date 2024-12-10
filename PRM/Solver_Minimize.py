@@ -84,8 +84,8 @@ class TrajectoryOptimizer:
         trajectory_x, trajectory_y, trajectory_theta = self.get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state)
         
         plt.quiver(trajectory_x[::10], trajectory_y[::10], np.cos(trajectory_theta[::10]), np.sin(trajectory_theta[::10]), 
-                   scale=100, width=0.002, color='r', label='_Hidden label')
-        plt.plot(trajectory_x, trajectory_y, color="r")
+                   scale=100, width=0.002, color='r', label='_Hidden label', zorder=10)
+        plt.plot(trajectory_x, trajectory_y, color="r", zorder=10)
         plt.xlabel('x')
         plt.ylabel('y')
         plt.title('Trajectory')

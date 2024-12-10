@@ -17,10 +17,10 @@ class PRM:
         self.use_mlp = use_mlp
         
         #limitation on road:
-        self.theta_diff_before = 135 * np.pi/180  # before finding solution
-        self.theta_diff_after = 60 * np.pi/180   # after finding solution
+        self.theta_diff_before = 180 * np.pi/180  # before finding solution
+        self.theta_diff_after = 30 * np.pi/180   # after finding solution
         self.max_stirring = np.pi/2
-        self.max_dist_error = 0.05 #in meter
+        self.max_dist_error = 0.25 #in meter
 
         self.start_point = start_point
         self.end_point = end_point
@@ -30,7 +30,7 @@ class PRM:
         self.shortest_path = None
 
         # MLP model
-        self.model = torch.load("experiments/Dataset_smaller_15__layers_256/model_[3, 256, 256, 256, 256, 3]")
+        self.model = torch.load("checkpoints/[3, 128, 128, 128, 3]__2000__100__12_08_14_23_49")
 
         self.nodes = self.generate_random_nodes(seed)
         if self.use_mlp:
@@ -251,16 +251,16 @@ class PRM:
     def plot(self):
         f = plt.figure(figsize=(8, 8))
         plt.quiver(self.nodes[:, 0], self.nodes[:, 1], np.cos(self.nodes[:, 2]), np.sin(self.nodes[:, 2]), 
-                   scale=100, width=0.002, color='b', label='_Hidden label')
+                   scale=100, width=0.002, color='b', label='_Hidden label', zorder=1)
 
         for edge in self.edges:
             node1 = self.nodes[edge[0]]
             node2 = self.nodes[edge[1]]
-            plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='black', alpha=0.3)
+            plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='black', alpha=0.3, zorder=2)
 
         for obstacle in self.obstacles:
             x,y = obstacle.exterior.xy
-            plt.plot(x,y, c='black')
+            plt.plot(x,y, c='black', zorder=3)
 
         if self.shortest_path is not None:
             for i in range(np.size(self.shortest_path, axis=0)):
@@ -274,10 +274,10 @@ class PRM:
 
         # Plot start point
         plt.quiver(self.nodes[-2, 0], self.nodes[-2, 1], np.cos(self.nodes[-2, 2]), np.sin(self.nodes[-2, 2]), 
-                   scale=100, width=0.002, color='g', label='Start')
+                   scale=100, width=0.002, color='g', label='Start', zorder=4)
         # Plot end point
         plt.quiver(self.nodes[-1, 0], self.nodes[-1, 1], np.cos(self.nodes[-1, 2]), np.sin(self.nodes[-1, 2]), 
-                   scale=100, width=0.002, color='g', label='End')
+                   scale=100, width=0.002, color='g', label='End', zorder=4)
 
         plt.xlabel('X')
         plt.ylabel('Y')
