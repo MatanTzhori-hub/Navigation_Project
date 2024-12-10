@@ -111,6 +111,7 @@ class Trainer(abc.ABC):
         """
         sample_every = 25
         if plot_samples is not None:
+            plt.ioff()
             os.mkdir(plot_samples)
         
         actual_num_epochs = 0
@@ -167,6 +168,9 @@ class Trainer(abc.ABC):
             if self.scheduler is not None:
                 self.scheduler.step(train_loss_epoch)
 
+
+        if plot_samples is not None:
+            plt.ion()
         return FitResult(actual_num_epochs, train_loss=train_loss, train_xy_dist=train_xy_dist, train_theta_diff=train_theta_diff, test_loss=test_loss, test_xy_dist=test_xy_dist, test_theta_diff=test_theta_diff)
 
     def save_checkpoint(self, checkpoint_filename: str):

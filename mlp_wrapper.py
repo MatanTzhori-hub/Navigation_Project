@@ -134,11 +134,9 @@ def main():
                     early_stopping = 100
                     print_every = 10
                     
-                    plt.ioff()
                     trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
                     fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
                                         early_stopping=early_stopping, print_every=print_every, plot_samples=plot_samples_dir)
-                    plt.ion()
                     
                     fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
                     
