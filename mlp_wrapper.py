@@ -63,7 +63,7 @@ def plot_fit(
         ax.set_title(attr)
 
         if loss_avg == "loss":
-            ax.set_xlabel("Iteration #")
+            ax.set_xlabel("Epoch #")
             ax.set_ylabel("Loss")
             if log_loss:
                 ax.set_yscale("log")
@@ -80,9 +80,9 @@ def plot_fit(
             ax.legend()
         ax.grid(True)
 
-    plt.suptitle(f"""{title}\n 
-                Train: Avg. Loss {fit_res.train_loss[-1]:.3f}, Avg. XY Distance {fit_res.train_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.train_theta_diff[-1]:.3f}\n
-                Test:  Avg. Loss {fit_res.test_loss[-1]:.3f}, Avg. XY Distance {fit_res.test_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.test_theta_diff[-1]:.3f}\n""")
+    plt.suptitle(f"""{title}
+                Train: Avg. Loss {fit_res.train_loss[-1]:.3f}, Avg. XY Distance {fit_res.train_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.train_theta_diff[-1]:.3f}
+                Test:  Avg. Loss {fit_res.test_loss[-1]:.3f}, Avg. XY Distance {fit_res.test_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.test_theta_diff[-1]:.3f}""")
     return fig, axes
 
 
@@ -127,10 +127,10 @@ def main():
                     
                     epochs = 201
                     date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-                    checkpoint = f'checkpoints/model_{[in_dim] + dims}'
+                    model_name = f'{[in_dim] + dims}__{date}'
+                    checkpoint = f'checkpoints/model_{model_name}'
                     checkpoint = checkpoint + '_norm' if normalize else checkpoint
-                    checkpoint = checkpoint + f'__{date}'
-                    plot_samples_dir = f'figures/MLP_Training/{date}'
+                    plot_samples_dir = f'figures/MLP_Training/{model_name}'
                     early_stopping = 100
                     print_every = 10
                     
@@ -140,7 +140,8 @@ def main():
                     
                     fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
                     
-                    plt.savefig(f"figures/MLP_Training/{date}/{[in_dim] + dims}__{batch_size}__{ds_size}__.png")
+                    plt.savefig(f"{plot_samples_dir}/{model_name}.png")
+                    plt.close()
                     # plt.show()
         
 if __name__ == "__main__":
