@@ -17,8 +17,8 @@ class PRM:
         self.use_mlp = use_mlp
         
         #limitation on road:
-        self.theta_diff_before = 180 * np.pi/180  # before finding solution
-        self.theta_diff_after = 30 * np.pi/180   # after finding solution
+        self.theta_diff_before = 135 * np.pi/180  # before finding solution
+        self.theta_diff_after = 60 * np.pi/180   # after finding solution
         self.max_stirring = np.pi/2
         self.max_dist_error = 0.25 #in meter
 
@@ -152,7 +152,7 @@ class PRM:
             neighbors = self.nodes[indices, :]
             v, stir, T = v[solution_limit], stir[solution_limit], T[solution_limit]
             
-            trajectory = self.solver.get_trajectory(v, stir, T, begin_node)
+            trajectory = utils.get_trajectory(v, stir, T, begin_node, self.solver.L)
             
             theta_limited_after = self.limit_by_theta(trajectory[2][:, -1], neighbors[:, 2], self.theta_diff_after)
             limit_dist = self.limit_by_distance(neighbors[:, 0], neighbors[:, 1], trajectory[0][:, -1], trajectory[1][:, -1])
@@ -211,7 +211,7 @@ class PRM:
                     
                     solution_limit = self.limit_by_velocity_stirring(v,stir)
                     if (solution_limit):
-                        trajectory = self.solver.get_trajectory(v, stir, self.solver.T, begin_node)
+                        trajectory = utils.get_trajectory(v, stir, self.solver.T, begin_node, self.solver.L)
                         dest = utils.destination(self.solver.L, self.solver.T, v, stir, begin_node)
                         weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
 
@@ -270,7 +270,7 @@ class PRM:
                 phi = self.shortest_path[i][7]
                 # plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red', alpha=1)
                 T = self.shortest_path[i][9]
-                self.solver.plot_trajectory(v, phi, T, start_node)
+                utils.plot_trajectory(v, phi, T, start_node, self.solver.L, 'r')
 
         # Plot start point
         plt.quiver(self.nodes[-2, 0], self.nodes[-2, 1], np.cos(self.nodes[-2, 2]), np.sin(self.nodes[-2, 2]), 
@@ -294,6 +294,7 @@ class PRM:
                     goal_node = self.shortest_path[i][3:6]
                     v = self.shortest_path[i][6]
                     phi = self.shortest_path[i][7]
+                    T = self.shortest_path[i][9]
                     plt.figure(figsize=(8, 8))
                     
                     plt.xlim(min(start_node[0], goal_node[0]) - 10, max(start_node[0], goal_node[0]) + 10)
@@ -301,7 +302,7 @@ class PRM:
 
                     plt.scatter(goal_node[0], goal_node[1], color='green', label='Goal', zorder=5)
                     plt.scatter(start_node[0], start_node[1], color='green', label='Initial', zorder=5)
-                    self.solver.plot_trajectory(v, phi, start_node)
+                    utils.plot_trajectory(v, phi, T, start_node, self.solver.L)
                     plt.quiver(goal_node[0], goal_node[1], np.cos(goal_node[2]), np.sin(goal_node[2]), scale=10, color='b', label='_Hidden label')
                     plt.quiver(start_node[0], start_node[1], np.cos(start_node[2]), np.sin(start_node[2]), scale=10, color='b', label='_Hidden label')
                     

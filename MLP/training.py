@@ -2,6 +2,8 @@ import os
 import abc
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import torch
 import torch.nn as nn
 import torch.utils
@@ -67,6 +69,18 @@ class Trainer(abc.ABC):
         xy_mean = np.mean(np.sqrt(np.sum(((x[:, 0:2] - end[:, 0:2])**2), axis=1)))
 
         return xy_mean, theta_diff_mean
+    
+    def plot_samples(self, x, y, dir, epoch):
+        self.model.eval()
+        y_pred = self.model(x)
+        y_pred = y_pred.detach().numpy()
+        self.model.train()
+        utils.plot_trajectory(y[:, 0], y[:, 1], y[:, 2], [0,0,0], 2, 'b')
+        utils.plot_trajectory(y_pred[:, 0], y_pred[:, 1], y_pred[:, 2], [0,0,0], 2, 'r')
+        plt.title(f"Test samples, epoch: {epoch}")
+        plt.legend(handles=[Line2D([0], [0], color='b', label='Expected'), Line2D([0], [0], color='r', label='Predicted')])
+        plt.savefig(f"{dir}/epoch_{epoch}")
+        plt.close()
         
 
     def fit(
@@ -77,6 +91,7 @@ class Trainer(abc.ABC):
         checkpoints: str = None,
         early_stopping: int = None,
         print_every: int = 1,
+        plot_samples: str = None,
         **kw,
     ) -> FitResult:
         """
@@ -91,9 +106,13 @@ class Trainer(abc.ABC):
         :param early_stopping: Whether to stop training early if there is no
             test loss improvement for this number of epochs.
         :param print_every: Print progress every this number of epochs.
+        :param plot_samples: Save sampling plots every few epochs in the given directory.
         :return: A FitResult object containing train and test losses per epoch.
         """
-
+        sample_every = 25
+        if plot_samples is not None:
+            os.mkdir(plot_samples)
+        
         actual_num_epochs = 0
         epochs_without_improvement = 0
 
@@ -141,6 +160,10 @@ class Trainer(abc.ABC):
                 if(early_stopping is not None and epochs_without_improvement >= early_stopping):
                     break
 
+            if (plot_samples is not None) and (epoch % sample_every == 0):
+                x, y = dl_test.dataset[:25]
+                self.plot_samples(x, y, plot_samples, epoch)
+            
             if self.scheduler is not None:
                 self.scheduler.step(train_loss_epoch)
 

@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
 import matplotlib.pyplot as plt
+from scripts import utils
 
 class TrajectoryOptimizer:
     def __init__(self, L=2.0, T=1, distance_radius = 10):
@@ -46,51 +47,6 @@ class TrajectoryOptimizer:
         v_optimal, phi_optimal = result.x[0], result.x[1]
         return v_optimal, phi_optimal
 
-    def get_trajectory(self, v_optimal, phi_optimal, T_optimal, initial_state, steps=100):
-        v_optimal = np.array(v_optimal)
-        phi_optimal = np.array(phi_optimal)
-        T_optimal = np.array(T_optimal)
-        length = v_optimal.size
-        initial_state = np.tile(initial_state, (length, 1)).T
-        
-        x, y, theta = initial_state
-        trajectory_x = np.zeros(shape=(length, steps))
-        trajectory_y = np.zeros(shape=(length, steps))
-        trajectory_theta = np.zeros(shape=(length, steps))
-        
-        dt = T_optimal / steps
-        for i in np.arange(0, steps):
-            x += v_optimal * np.cos(theta) * dt
-            y += v_optimal * np.sin(theta) * dt
-            theta += (v_optimal / self.L) * np.tan(phi_optimal) * dt
-            trajectory_x[:, i] = x
-            trajectory_y[:, i] = y
-            trajectory_theta[:, i] = theta
-        return (trajectory_x, trajectory_y, trajectory_theta)
-
-    # def get_trajectory(self, v_optimal, phi_optimal, initial_state):
-    #     x, y, theta = initial_state
-    #     trajectory_x, trajectory_y, trajectory_theta = [x], [y], [theta]
-    #     for _ in np.arange(0, self.T, self.dt):
-    #         x += v_optimal * np.cos(theta) * self.dt
-    #         y += v_optimal * np.sin(theta) * self.dt
-    #         theta += (v_optimal / self.L) * np.tan(phi_optimal) * self.dt
-    #         trajectory_x.append(x)
-    #         trajectory_y.append(y)
-    #         trajectory_theta.append(theta)  
-    #     return (trajectory_x, trajectory_y, trajectory_theta)
-
-    def plot_trajectory(self, v_optimal, phi_optimal, T_optimal, initial_state):
-        trajectory_x, trajectory_y, trajectory_theta = self.get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state)
-        
-        plt.quiver(trajectory_x[::10], trajectory_y[::10], np.cos(trajectory_theta[::10]), np.sin(trajectory_theta[::10]), 
-                   scale=100, width=0.002, color='r', label='_Hidden label', zorder=10)
-        plt.plot(trajectory_x, trajectory_y, color="r", zorder=10)
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.title('Trajectory')
-        plt.grid(True)
-
 # Usage example
 if __name__ == "__main__":
     optimizer = TrajectoryOptimizer()
@@ -102,5 +58,5 @@ if __name__ == "__main__":
     print(f"Optimal v: {v_optimal}, Optimal phi: {phi_optimal}")
 
     # Plot the optimal trajectory
-    optimizer.plot_trajectory(v_optimal, phi_optimal, initial_state, goal_state)
+    utils.plot_trajectory(v_optimal, phi_optimal, optimizer.T, initial_state, optimizer.L)
     

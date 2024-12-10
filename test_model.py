@@ -8,28 +8,6 @@ import datetime
 
 from scripts import utils
 
-def get_trajectory(v_optimal, phi_optimal, initial_state, T, L, steps=100):
-        x, y, theta = initial_state
-        trajectory_x, trajectory_y, trajectory_theta = [x], [y], [theta]
-        dt = T / steps
-        for _ in np.arange(steps):
-            theta += (v_optimal / L) * np.tan(phi_optimal) * dt
-            x += v_optimal * np.cos(theta) * dt
-            y += v_optimal * np.sin(theta) * dt
-            trajectory_x.append(x)
-            trajectory_y.append(y)
-            trajectory_theta.append(theta)  
-        return (trajectory_x, trajectory_y, trajectory_theta)
-
-
-def plot_trajectory(v_optimal, phi_optimal, initial_state, T, L, color, label=None):
-    trajectory_x, trajectory_y, trajectory_theta = get_trajectory(v_optimal, phi_optimal, initial_state, T, L)
-    
-    plt.quiver(trajectory_x[::10], trajectory_y[::10], 
-                np.cos(trajectory_theta[::10]), np.sin(trajectory_theta[::10]), 
-                scale=100, width=0.002, color=color, label=label)
-    plt.plot(trajectory_x, trajectory_y, color=color)
-
 checkpoint_filename = "checkpoints/[3, 128, 128, 128, 3]__2000__100__12_08_14_23_49"
 data_path = "dataset/AckermanDataset10K_test.csv"
 # data_path = "dataset/overfitting_train.csv"
@@ -44,13 +22,13 @@ y = data[:25, 3:].numpy()
 
 # x = utils.destination(2, data[0, 5], data[0, 3], data[0, 4], torch.tensor([0,0,0]))
 
-
 y_pred = model(x)
 y_pred = y_pred.detach().numpy()
+L = 2
 
 for i in range(x.shape[0]):
-    plot_trajectory(y[i, 0], y[i, 1], [0,0,0], y[i, 2], 2, 'b')
-    plot_trajectory(y_pred[i, 0], y_pred[i, 1], [0,0,0], y_pred[i, 2], 2, 'r')
+    utils.plot_trajectory(y[i, 0], y[i, 1], y[i, 2], [0,0,0], L, 'b')
+    utils.plot_trajectory(y_pred[i, 0], y_pred[i, 1], y_pred[i, 2], [0,0,0], L, 'r')
     plt.quiver(x[i, 0], x[i, 1], 
                     np.cos(x[i, 2]), np.sin(x[i, 2]), 
                     scale=100, width=0.002)

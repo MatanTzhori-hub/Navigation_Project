@@ -80,7 +80,9 @@ def plot_fit(
             ax.legend()
         ax.grid(True)
 
-    plt.suptitle(title)
+    plt.suptitle(f"""{title}\n 
+                Train: Avg. Loss {fit_res.train_loss[-1]:.3f}, Avg. XY Distance {fit_res.train_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.train_theta_diff[-1]:.3f}\n
+                Test:  Avg. Loss {fit_res.test_loss[-1]:.3f}, Avg. XY Distance {fit_res.test_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.test_theta_diff[-1]:.3f}\n""")
     return fig, axes
 
 
@@ -123,21 +125,24 @@ def main():
                     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
                     # scheduler= None
                     
-                    epochs = 500
+                    epochs = 201
+                    date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
                     checkpoint = f'checkpoints/model_{[in_dim] + dims}'
                     checkpoint = checkpoint + '_norm' if normalize else checkpoint
+                    checkpoint = checkpoint + f'__{date}'
+                    plot_samples_dir = f'figures/MLP_Training/{date}'
                     early_stopping = 100
                     print_every = 10
                     
+                    plt.ioff()
                     trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
                     fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
-                                        early_stopping=early_stopping, print_every=print_every)
-                    
+                                        early_stopping=early_stopping, print_every=print_every, plot_samples=plot_samples_dir)
+                    plt.ion()
                     
                     fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
                     
-                    date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-                    plt.savefig(f"figures/MLP_Training/{[in_dim] + dims}__{batch_size}__{ds_size}__{date}.png")
+                    plt.savefig(f"figures/MLP_Training/{date}/{[in_dim] + dims}__{batch_size}__{ds_size}__.png")
                     # plt.show()
         
 if __name__ == "__main__":
