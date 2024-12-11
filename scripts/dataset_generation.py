@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import utils
 
 def show_hist(dataset):
-        fig, axs = plt.subplots(2, 3, figsize=(10, 12))  # 3 rows, 1 column
+        fig, axs = plt.subplots(2, 3, figsize=(10, 12))
         axs = axs.reshape(-1)
         
         # Plot Velocity histogram
@@ -42,14 +42,31 @@ def show_hist(dataset):
         axs[5].hist(dataset[:, 2], bins=30, alpha=0.7, color='blue')
         axs[5].set_title('Theta Distribution')
         axs[5].grid()
-        
 
         # Adjust layout
         plt.tight_layout()
 
         # Show the plots
         plt.show()
+        
+        
+def show_dist_hist(dataset):
+        fig, axs = plt.subplots(1, 1, figsize=(10, 12))
+        # axs = axs.reshape(-1)
+        
+        # Plot Distance histogram
+        distances = np.sqrt(dataset[:, 0]**2 + dataset[:, 1]**2)
+        
+        axs.hist(distances, bins=30, alpha=0.7, color='blue')
+        axs.set_title('Distance Distribution')
+        axs.grid()
+        # Adjust layout
+        plt.tight_layout()
 
+        # Show the plots
+        plt.show()
+        
+        
 gen_n_samples = 400000  # num of samples to generate
 n_samples = 10000       # num of samples to save
 
@@ -64,9 +81,9 @@ test_file = 'AckermanDataset10K_test.csv'
 
 max_delta = np.pi/4
 min_v = 5
-max_v = 10
+max_v = 15
 min_T = 0.1
-max_T = 3.5
+max_T = 10
 L = 2
 start = [0,0,0]
 
@@ -85,8 +102,8 @@ dataset = np.stack((*goal, v, delta, T), axis=1)
 # Filter samples that circle more than half a circle
 filter_idxs = (-np.pi < dataset[:, 2]) & (dataset[:, 2] < np.pi)
 dataset = dataset[filter_idxs]
-# Filter samples with distance smaller than 15
-filter_idxs = (15 > np.sqrt(dataset[:, 0]**2 + dataset[:, 1]**2))
+# Filter samples with distance smaller than 50
+filter_idxs = (50 > np.sqrt(dataset[:, 0]**2 + dataset[:, 1]**2))
 dataset = dataset[filter_idxs]
 
 # save only n_samples
@@ -94,6 +111,7 @@ dataset = dataset[0:n_samples, :]
 
 if plot_hist:
         show_hist(dataset)
+        show_dist_hist(dataset)
     
 test_size = (int)((np.floor(n_samples*ratio)))
 train_size = n_samples - test_size

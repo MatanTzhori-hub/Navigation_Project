@@ -116,7 +116,9 @@ def main():
                     leaning_rate = 0.005
                     reg = 0
                     
-                    model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear, norm=normalize)
+                    # model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear, norm=normalize)
+                    # model = model.double()
+                    model = mlp.MOE(in_dim=in_dim, dims=dims, nonlins=nonlinear, num_experts=5, top_k=2)
                     model = model.double()
                     print(model)
 
