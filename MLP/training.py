@@ -152,8 +152,8 @@ class Trainer(abc.ABC):
                 self.writer.add_scalars('XY_Distance', {'train': train_xy_dist_epoch, 'test': test_xy_dist_epoch}, epoch)
                 self.writer.add_scalars('Theta_Difference', {'train': train_theta_diff_epoch, 'test': test_theta_diff_epoch}, epoch)
             
-            if best_loss is None or train_loss_epoch < best_loss:
-                best_loss = train_loss_epoch
+            if best_loss is None or test_loss_epoch < best_loss:
+                best_loss = test_loss_epoch
                 epochs_without_improvement = 0
                 
                 if checkpoints is not None:

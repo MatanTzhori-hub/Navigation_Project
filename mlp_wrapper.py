@@ -92,19 +92,19 @@ def main():
     logdir = "logs"
     writer = SummaryWriter(logdir)
     
-    normalize = False
-    batch_sizes = [250, 500, 1000, 2000]
-    datasets = [10, 30, 50, 70, 100]
+    normalize = True
+    batch_sizes = [1000]
+    datasets = [50]
 
     #hidden_dims = [32, 64, 128]
-    hidden_dims = [32, 64, 128]
+    hidden_dims = [256]
     for i, dim in enumerate(hidden_dims):
-        for j in range(1, 4):
+        for j in range(4, 5):
             for batch_size in batch_sizes:
                 for ds_size in datasets:
                     path_to_ds = f"dataset/Below_15/AckermanDataset{ds_size}K"
                     dl_params = {'batch_size': batch_size, 'shuffle': True}
-                    train_ds, train_dl, test_ds, test_dl = dataset_load.create_dataloaders(path_to_ds, **dl_params)
+                    train_ds, train_dl, test_ds, test_dl, x_min, x_max = dataset_load.create_dataloaders(path_to_ds, **dl_params)
                     
                     ## MLP params:
                     in_dim = 3
@@ -118,9 +118,9 @@ def main():
                     leaning_rate = 0.005
                     reg = 0
                     
-                    # model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear, norm=normalize)
-                    # model = model.double()
+                    # model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
                     model = mlp.MOE(in_dim=in_dim, dims=dims, nonlins=nonlinear, num_experts=5, top_k=2)
+                    model.normalized(normalize, x_min, x_max)
                     model = model.double()
                     print(model)
 

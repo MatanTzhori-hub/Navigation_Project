@@ -4,6 +4,7 @@ from typing import Union, Sequence
 from collections import defaultdict
 from sklearn.preprocessing import MinMaxScaler
 
+
 ACTIVATIONS = {
     "relu": nn.ReLU,
     "tanh": nn.Tanh,
@@ -34,7 +35,7 @@ class MLP(nn.Module):
     """
 
     def __init__(
-        self, in_dim: int, dims: Sequence[int], nonlins: Sequence[Union[str, nn.Module]], norm=False
+        self, in_dim: int, dims: Sequence[int], nonlins: Sequence[Union[str, nn.Module]]
     ):
         """
         :param in_dim: Input dimension.
@@ -46,7 +47,7 @@ class MLP(nn.Module):
             Length should match 'dims'.
         """
         assert len(nonlins) == len(dims)
-        self.norm = norm
+        self.norm = False
     
         self.in_dim = in_dim
         self.out_dim = dims[-1]
@@ -65,15 +66,19 @@ class MLP(nn.Module):
                 # layers.append(nn.Dropout(p=0.03))
 
         self.layers = nn.Sequential(*layers)
-
+        
+    def normalized(self, to_norm: bool, xmin: Sequence[float], xmax: Sequence[float]):
+        self.to_norm = to_norm
+        self.xmin = xmin
+        self.xmax = xmax
+        
     def forward(self, x: Tensor) -> Tensor:
         """
         :param x: An input tensor, of shape (N, D) containing N samples with D features.
         :return: An output tensor of shape (N, D_out) where D_out is the output dim.
         """
-        if self.norm:
-            scaler = MinMaxScaler().fit(x)
-            x = torch.Tensor(scaler.transform(x)).to(torch.float64)
+        if self.to_norm:
+            x = (x - self.xmin) / (self.xmax - self.xmin)
         return self.layers(x)
 
 
@@ -126,6 +131,7 @@ class MOE(nn.Module):
         super(MOE, self).__init__()
         assert len(nonlins) == len(dims)
         
+        self.to_norm = False
         self.in_dim = in_dim
         self.num_experts = num_experts
         self.out_dim = dims[-1]
@@ -133,12 +139,19 @@ class MOE(nn.Module):
         self.experts = nn.ModuleList([MLP(in_dim, dims, nonlins) for _ in range(num_experts)])
         self.gating = GatingNetwork(in_dim, num_experts, top_k)
         
+    def normalized(self, to_norm: bool, xmin: Sequence[float], xmax: Sequence[float]):
+        self.to_norm = to_norm
+        self.xmin = xmin
+        self.xmax = xmax
 
     def forward(self, x: Tensor) -> Tensor:
         """
         :param x: An input tensor, of shape (N, D) containing N samples with D features.
         :return: An output tensor of shape (N, D_out) where D_out is the output dim.
         """
+        if self.to_norm:
+            x = (x - self.xmin) / (self.xmax - self.xmin)
+        
         weights, indices = self.gating(x)
         # final_output = torch.zeros((x.shape[0], self.out_dim)).to(x.device)
 
