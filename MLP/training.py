@@ -70,14 +70,16 @@ class Trainer(abc.ABC):
 
         return xy_mean, theta_diff_mean
     
-    def plot_samples(self, x, y, dir, epoch):
+    def plot_samples(self, x, y, dir, epoch, info):
         self.model.eval()
         y_pred = self.model(x)
         y_pred = y_pred.detach().numpy()
         self.model.train()
         utils.plot_trajectory(y[:, 0], y[:, 1], y[:, 2], [0,0,0], 2, 'b')
         utils.plot_trajectory(y_pred[:, 0], y_pred[:, 1], y_pred[:, 2], [0,0,0], 2, 'r')
-        plt.title(f"Test samples, epoch: {epoch}")
+        plt.title(f"""Test samples, epoch: {epoch}
+                  Train: Avg. Loss {info[0]:.3f}, Avg. XY {info[1]:.3f}, Avg. Theta {info[2]:.3f}
+                Test: Avg. Loss {info[3]:.3f}, Avg. XY {info[4]:.3f}, Avg. Theta {info[5]:.3f}""")
         plt.legend(handles=[Line2D([0], [0], color='b', label='Expected'), Line2D([0], [0], color='r', label='Predicted')])
         plt.savefig(f"{dir}/epoch_{epoch}")
         plt.close()
@@ -162,8 +164,10 @@ class Trainer(abc.ABC):
                     break
 
             if (plot_samples is not None) and (epoch % sample_every == 0):
+                info = (train_loss[-1], train_xy_dist[-1], train_theta_diff[-1],
+                        test_loss[-1], test_xy_dist[-1], test_theta_diff[-1])
                 x, y = dl_test.dataset[:25]
-                self.plot_samples(x, y, plot_samples, epoch)
+                self.plot_samples(x, y, plot_samples, epoch, info)
             
             if self.scheduler is not None:
                 self.scheduler.step(train_loss_epoch)

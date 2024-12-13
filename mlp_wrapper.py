@@ -80,9 +80,11 @@ def plot_fit(
             ax.legend()
         ax.grid(True)
 
+    min_index = fit_res.test_loss.index(min(fit_res.test_loss))
+
     plt.suptitle(f"""{title}
-                Train: Avg. Loss {fit_res.train_loss[-1]:.3f}, Avg. XY Distance {fit_res.train_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.train_theta_diff[-1]:.3f}
-                Test:  Avg. Loss {fit_res.test_loss[-1]:.3f}, Avg. XY Distance {fit_res.test_xy_dist[-1]:.3f}, Avg. Theta Error {fit_res.test_theta_diff[-1]:.3f}""")
+                Train: Avg. Loss {fit_res.train_loss[min_index]:.3f}, Avg. XY Distance {fit_res.train_xy_dist[min_index]:.3f}, Avg. Theta Error {fit_res.train_theta_diff[min_index]:.3f}
+                Test:  Avg. Loss {fit_res.test_loss[min_index]:.3f}, Avg. XY Distance {fit_res.test_xy_dist[min_index]:.3f}, Avg. Theta Error {fit_res.test_theta_diff[min_index]:.3f}""")
     return fig, axes
 
 
@@ -127,9 +129,9 @@ def main():
                     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
                     # scheduler= None
                     
-                    epochs = 201
+                    epochs = 401
                     date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-                    model_name = f'{[in_dim] + dims}__{date}'
+                    model_name = f'{[in_dim] + dims}__{batch_size}_{ds_size}__{date}'
                     checkpoint = f'checkpoints/model_{model_name}'
                     checkpoint = checkpoint + '_norm' if normalize else checkpoint
                     plot_samples_dir = f'figures/MLP_Training/{model_name}'
