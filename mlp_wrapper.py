@@ -99,10 +99,10 @@ def main():
     experts_amounts = [3, 5, 10]
     k_values = [2, 3, 5]
     normalize = [True, False]
-    batch_sizes = [2000]
+    batch_sizes = [5000]
     datasets = [50]
     #hidden_dims = [32, 64, 128]
-    hidden_dims = [32, 64, 128, 256]
+    hidden_dims = [128, 256]
     learning_rates = [0.005]
     
     p = itertools.product(model_types, normalize, hidden_dims, batch_sizes, datasets, learning_rates)
@@ -144,11 +144,11 @@ def main():
                 
                 epochs = 401
                 date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-                save_dir = f'runs/{model_type}__{date}'
-                os.makedirs(save_dir, exist_ok=True)
-                plot_samples_dir = f'{save_dir}/figures'
-                model_name = f'{model_type}_{[in_dim] + dims}'
+                model_name = f'{model_type}_{[in_dim] + dims}__{date}'
                 model_name = f'{model_name}_norm' if norm else model_name
+                save_dir = f'runs/{model_name}'
+                os.makedirs(save_dir, exist_ok=True)
+                plot_samples_dir = f'{save_dir}/Samples_Figs'
                 checkpoint = f'{save_dir}/model_{model_name}'
                 early_stopping = 100
                 print_every = 10
@@ -159,7 +159,7 @@ def main():
                 
                 fig, ax = plot_fit(fit_res, title=f"Model {model_type} {[in_dim] + dims}")
                 
-                plt.savefig(f"{plot_samples_dir}/{model_name}.png")
+                plt.savefig(f"{save_dir}/{model_name}.png")
                 plt.close()
                 
                 yaml_dump = {
