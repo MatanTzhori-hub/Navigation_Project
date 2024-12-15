@@ -1,7 +1,9 @@
+import os
 import torch
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
+import yaml
 from torch.utils.tensorboard import SummaryWriter
 
 from MLP import mlp
@@ -90,63 +92,91 @@ def plot_fit(
 
 def main():
     logdir = "logs"
-    writer = SummaryWriter(logdir)
+    # writer = SummaryWriter(logdir)
+    writer = None
     
-    normalize = True
-    batch_sizes = [1000]
+    model_types = ["MOE", "MLP"]
+    experts_amounts = [3, 5, 10]
+    k_values = [2, 3, 5]
+    normalize = [True, False]
+    batch_sizes = [2000]
     datasets = [50]
-
     #hidden_dims = [32, 64, 128]
-    hidden_dims = [256]
-    for i, dim in enumerate(hidden_dims):
-        for j in range(4, 5):
-            for batch_size in batch_sizes:
-                for ds_size in datasets:
-                    path_to_ds = f"dataset/Below_15/AckermanDataset{ds_size}K"
-                    dl_params = {'batch_size': batch_size, 'shuffle': True}
-                    train_ds, train_dl, test_ds, test_dl, x_min, x_max = dataset_load.create_dataloaders(path_to_ds, **dl_params)
-                    
-                    ## MLP params:
-                    in_dim = 3
-                    out_dim = 3
-                    
-                    dims = [dim] * j + [out_dim]
-                    depth = len(dims)
-                    nonlinear = ["relu"] * depth
-                    
-                    ## Optimizer params:
-                    leaning_rate = 0.005
-                    reg = 0
-                    
-                    # model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
-                    model = mlp.MOE(in_dim=in_dim, dims=dims, nonlins=nonlinear, num_experts=5, top_k=2)
-                    model.normalized(normalize, x_min, x_max)
-                    model = model.double()
-                    print(model)
+    hidden_dims = [32, 64, 128, 256]
+    learning_rates = [0.005]
+    
+    p = itertools.product(model_types, normalize, hidden_dims, batch_sizes, datasets, learning_rates)
+    for combo in p:
+        model_type, norm, dim, batch_size, ds_size, leaning_rate = combo
+        for i in range(len(k_values)):
+            if i > 0 and model_type != 'MOE':
+                continue
+            for j in range(1, 2):
+                
+                path_to_ds = f"dataset/Below_15/AckermanDataset{ds_size}K"
+                dl_params = {'batch_size': batch_size, 'shuffle': True}
+                train_ds, train_dl, test_ds, test_dl, x_min, x_max = dataset_load.create_dataloaders(path_to_ds, **dl_params)
+                
+                ## MLP params:
+                in_dim = 3
+                out_dim = 3
+                
+                dims = [dim] * j + [out_dim]
+                depth = len(dims)
+                nonlinear = ["relu"] * depth
+                
+                ## Optimizer params:
+                reg = 0
+                
+                if model_type == "MLP":
+                    model = mlp.MLP(in_dim=in_dim, dims=dims, nonlins=nonlinear)
+                elif model_type == "MOE":
+                    model = mlp.MOE(in_dim=in_dim, dims=dims, nonlins=nonlinear, num_experts=experts_amounts[i], top_k=k_values[i])
+                else:
+                    raise NotImplementedError("No such model")
+                model.normalized(normalize, x_min, x_max)
+                model = model.double()
 
-                    loss_fn = torch.nn.MSELoss()
-                    optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
-                    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
-                    # scheduler= None
+                loss_fn = torch.nn.MSELoss()
+                optimizer = torch.optim.Adam(model.parameters(), lr=leaning_rate, weight_decay=reg, amsgrad=False)
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
+                # scheduler= None
+                
+                epochs = 401
+                date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
+                save_dir = f'runs/{model_type}__{date}'
+                os.makedirs(save_dir, exist_ok=True)
+                plot_samples_dir = f'{save_dir}/figures'
+                model_name = f'{model_type}_{[in_dim] + dims}'
+                model_name = f'{model_name}_norm' if norm else model_name
+                checkpoint = f'{save_dir}/model_{model_name}'
+                early_stopping = 100
+                print_every = 10
+                
+                trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
+                fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
+                                    early_stopping=early_stopping, print_every=print_every, plot_samples=plot_samples_dir)
+                
+                fig, ax = plot_fit(fit_res, title=f"Model {model_type} {[in_dim] + dims}")
+                
+                plt.savefig(f"{plot_samples_dir}/{model_name}.png")
+                plt.close()
+                
+                yaml_dump = {
+                    'date':date, 
+                    'model': {'type': model_type, 'hidden_dims': f'{[in_dim] + dims}', 'depth': depth, 'activation_func': 'ReLU'},
+                    'is_normalized': norm, 'batch_size': batch_size, 'dataset': path_to_ds, 'dataset_size': ds_size,
+                    'Training Params': {
+                        'learning_rate': leaning_rate, 'early_stop': early_stopping, 'max_epochs': epochs, 
+                        'loss_func': type(loss_fn).__name__, 'optimizer': type(optimizer).__name__, 'scheduler': type(scheduler).__name__,
+                        'sched_factor': scheduler.factor, 'sched_patience': scheduler.patience, 
+                    }
+                }
+                if model_type == 'MOE':
+                    yaml_dump['model'].update({'num_experts': experts_amounts[i], 'top_k': k_values[i]})
                     
-                    epochs = 401
-                    date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-                    model_name = f'{[in_dim] + dims}__{batch_size}_{ds_size}__{date}'
-                    checkpoint = f'checkpoints/model_{model_name}'
-                    checkpoint = checkpoint + '_norm' if normalize else checkpoint
-                    plot_samples_dir = f'figures/MLP_Training/{model_name}'
-                    early_stopping = 100
-                    print_every = 10
-                    
-                    trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
-                    fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
-                                        early_stopping=early_stopping, print_every=print_every, plot_samples=plot_samples_dir)
-                    
-                    fig, ax = plot_fit(fit_res, title=f"Model layers (left -> right): {[in_dim] + dims}")
-                    
-                    plt.savefig(f"{plot_samples_dir}/{model_name}.png")
-                    plt.close()
-                    # plt.show()
+                with open(f'{save_dir}/configuration.yaml', 'w') as file:
+                    yaml.dump(yaml_dump, file, default_flow_style=False, sort_keys=False)
         
 if __name__ == "__main__":
     main()

@@ -32,8 +32,8 @@ class Trainer(abc.ABC):
         model: nn.Module,
         loss_fn,
         optimizer,
-        scheduler=None,
-        writer: SummaryWriter=None,
+        scheduler = None,
+        writer = None,
         device: Optional[torch.device] = None,
     ):
         """
@@ -75,11 +75,12 @@ class Trainer(abc.ABC):
         y_pred = self.model(x)
         y_pred = y_pred.detach().numpy()
         self.model.train()
+        plt.figure(figsize=(16,9))
         utils.plot_trajectory(y[:, 0], y[:, 1], y[:, 2], [0,0,0], 2, 'b')
         utils.plot_trajectory(y_pred[:, 0], y_pred[:, 1], y_pred[:, 2], [0,0,0], 2, 'r')
         plt.title(f"""Test samples, epoch: {epoch}
-                  Train: Avg. Loss {info[0]:.3f}, Avg. XY {info[1]:.3f}, Avg. Theta {info[2]:.3f}
-                Test: Avg. Loss {info[3]:.3f}, Avg. XY {info[4]:.3f}, Avg. Theta {info[5]:.3f}""")
+                      Train: Avg. Loss {info[0]:.3f}, Avg. XY {info[1]:.3f}, Avg. Theta {info[2]:.3f}
+                      Test: Avg. Loss {info[3]:.3f}, Avg. XY {info[4]:.3f}, Avg. Theta {info[5]:.3f}""")
         plt.legend(handles=[Line2D([0], [0], color='b', label='Expected'), Line2D([0], [0], color='r', label='Predicted')])
         plt.savefig(f"{dir}/epoch_{epoch}")
         plt.close()

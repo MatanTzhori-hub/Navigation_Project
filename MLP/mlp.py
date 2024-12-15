@@ -47,7 +47,7 @@ class MLP(nn.Module):
             Length should match 'dims'.
         """
         assert len(nonlins) == len(dims)
-        self.norm = False
+        self.to_norm = False
     
         self.in_dim = in_dim
         self.out_dim = dims[-1]
