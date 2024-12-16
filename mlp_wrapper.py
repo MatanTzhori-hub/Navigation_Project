@@ -4,7 +4,7 @@ import numpy as np
 import itertools
 import matplotlib.pyplot as plt
 import yaml
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 from MLP import mlp
 from MLP import training
@@ -13,14 +13,14 @@ from MLP import dataset_load
 
 import datetime
 
-
 def plot_fit(
     fit_res: FitResult,
     fig=None,
     log_loss=False,
     legend=None,
     train_test_overlay: bool = False,
-    title=""
+    title="",
+    remove_outliner = False
 ):
     """
     Plots a FitResult object.
@@ -60,6 +60,7 @@ def plot_fit(
 
         attr = f"{traintest}_{loss_avg}"
         data = getattr(fit_res, attr)
+        
         label = traintest if train_test_overlay else legend
         h = ax.plot(np.arange(1, len(data) + 1), data, label=label)
         ax.set_title(attr)
@@ -76,7 +77,15 @@ def plot_fit(
         else:
             ax.set_xlabel("Epoch #")
             ax.set_ylabel("Mean Theta Error")
+        
+        if remove_outliner:
+            Q1 = np.percentile(data, 25)
+            Q3 = np.percentile(data, 75)
+            IQR = Q3 - Q1
 
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            ax.set_ylim(lower_bound, upper_bound)
 
         if legend or train_test_overlay:
             ax.legend()
@@ -95,9 +104,9 @@ def main():
     # writer = SummaryWriter(logdir)
     writer = None
     
-    model_types = ["MOE", "MLP"]
-    experts_amounts = [3, 5, 10]
-    k_values = [2, 3, 5]
+    model_types = ["MOE"]#, "MLP"]
+    experts_amounts = [3, 5, 7]
+    k_values = [2, 2, 2]
     normalize = [True, False]
     batch_sizes = [5000]
     datasets = [50]
@@ -142,7 +151,7 @@ def main():
                 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
                 # scheduler= None
                 
-                epochs = 401
+                epochs = 300
                 date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
                 model_name = f'{model_type}_{[in_dim] + dims}__{date}'
                 model_name = f'{model_name}_norm' if norm else model_name
@@ -158,8 +167,10 @@ def main():
                                     early_stopping=early_stopping, print_every=print_every, plot_samples=plot_samples_dir)
                 
                 fig, ax = plot_fit(fit_res, title=f"Model {model_type} {[in_dim] + dims}")
-                
                 plt.savefig(f"{save_dir}/{model_name}.png")
+                plt.close()
+                fig, ax = plot_fit(fit_res, title=f"Model {model_type} {[in_dim] + dims}", remove_outliner=True)
+                plt.savefig(f"{save_dir}/{model_name}_OL.png")
                 plt.close()
                 
                 yaml_dump = {
