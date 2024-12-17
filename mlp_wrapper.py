@@ -99,17 +99,30 @@ def plot_fit(
     return fig, axes
 
 
+def save_best_values(fit_res: FitResult, save_dir: str):
+    min_index = fit_res.test_loss.index(min(fit_res.test_loss))
+    yaml_dump = {
+                    'loss': fit_res.test_loss[min_index],
+                    'xy_diff': fit_res.test_xy_dist[min_index],
+                    'theta_error': fit_res.test_theta_diff[min_index]
+                }
+    with open(f'{save_dir}/results.yaml', 'w') as file:
+                    yaml.dump(yaml_dump, file, default_flow_style=False, sort_keys=False)
+
 def main():
     logdir = "logs"
     # writer = SummaryWriter(logdir)
     writer = None
     
+    experiment_name = 'Exp1'
+    start_date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
+    
     model_types = ["MOE"]#, "MLP"]
-    experts_amounts = [3, 5, 7]
-    k_values = [2, 2, 2]
+    experts_amounts = [8, 9, 10]
+    k_values = [3, 3, 3]
     normalize = [True, False]
     batch_sizes = [5000]
-    datasets = [50]
+    datasets = [100]
     #hidden_dims = [32, 64, 128]
     hidden_dims = [128, 256]
     learning_rates = [0.005]
@@ -120,7 +133,7 @@ def main():
         for i in range(len(k_values)):
             if i > 0 and model_type != 'MOE':
                 continue
-            for j in range(1, 2):
+            for j in range(1, 3):
                 
                 path_to_ds = f"dataset/Below_15/AckermanDataset{ds_size}K"
                 dl_params = {'batch_size': batch_size, 'shuffle': True}
@@ -151,20 +164,21 @@ def main():
                 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=35, verbose=True)
                 # scheduler= None
                 
-                epochs = 300
+                epochs = 501
                 date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
                 model_name = f'{model_type}_{[in_dim] + dims}__{date}'
                 model_name = f'{model_name}_norm' if norm else model_name
-                save_dir = f'runs/{model_name}'
+                save_dir = f'runs/{experiment_name}_{start_date}/{model_name}'
                 os.makedirs(save_dir, exist_ok=True)
                 plot_samples_dir = f'{save_dir}/Samples_Figs'
                 checkpoint = f'{save_dir}/model_{model_name}'
-                early_stopping = 100
+                early_stopping = 75
                 print_every = 10
                 
                 trainer = training.Trainer(model, loss_fn, optimizer, scheduler, writer)
                 fit_res = trainer.fit(train_dl, test_dl, epochs, checkpoints=checkpoint,
                                     early_stopping=early_stopping, print_every=print_every, plot_samples=plot_samples_dir)
+                save_best_values(fit_res, save_dir)
                 
                 fig, ax = plot_fit(fit_res, title=f"Model {model_type} {[in_dim] + dims}")
                 plt.savefig(f"{save_dir}/{model_name}.png")
@@ -175,8 +189,8 @@ def main():
                 
                 yaml_dump = {
                     'date':date, 
-                    'model': {'type': model_type, 'hidden_dims': f'{[in_dim] + dims}', 'depth': depth, 'activation_func': 'ReLU'},
-                    'is_normalized': norm, 'batch_size': batch_size, 'dataset': path_to_ds, 'dataset_size': ds_size,
+                    'model': {'type': model_type, 'hidden_dims': f'{[in_dim] + dims}', 'activation_func': 'ReLU'},
+                    'is_normalized': norm, 'batch_size': batch_size, 'dataset': path_to_ds, 'dataset_size': f'{ds_size}K',
                     'Training Params': {
                         'learning_rate': leaning_rate, 'early_stop': early_stopping, 'max_epochs': epochs, 
                         'loss_func': type(loss_fn).__name__, 'optimizer': type(optimizer).__name__, 'scheduler': type(scheduler).__name__,
