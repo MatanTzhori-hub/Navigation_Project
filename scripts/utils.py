@@ -3,13 +3,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state, L, steps=100):
+def limit_by_distance(x1, y1, x2, y2):
+    return ((x1 - x2)**2 + (y1 - y2)**2) < 0.05
+
+def get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state, end_state, L, steps=100):
     dtype = np.float64
     v_optimal = np.array(v_optimal, dtype=dtype)
     phi_optimal = np.array(phi_optimal, dtype=dtype)
     T_optimal = np.array(T_optimal, dtype=dtype)
     length = v_optimal.size
     initial_state = np.tile(np.array(initial_state, dtype=dtype), (length, 1)).T
+    end_state = np.atleast_2d(np.array(end_state, dtype=dtype))
     
     x, y, theta = initial_state
     trajectory_x = np.zeros(shape=(length, steps))
@@ -24,11 +28,17 @@ def get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state, L, steps=10
         trajectory_x[:, i] = x
         trajectory_y[:, i] = y
         trajectory_theta[:, i] = theta
-    return (trajectory_x, trajectory_y, trajectory_theta)
+        
+        flag = limit_by_distance(x, y, end_state[:, 0], end_state[:, 1])
+        if any(flag):
+            T_optimal[flag] = (i+1) * dt[flag]
+        
+    return (trajectory_x, trajectory_y, trajectory_theta), T_optimal
 
 
 def plot_trajectory(v_optimal, phi_optimal, T_optimal, initial_state, L, color=None, label=None):
-    trajectory_x, trajectory_y, trajectory_theta = get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state, L)
+    trajectory, _ = get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state, [0, 0, 0], L)
+    trajectory_x, trajectory_y, trajectory_theta = trajectory
     
     for traj_x, traj_y, traj_theta in zip(trajectory_x, trajectory_y, trajectory_theta):
         plt.quiver(traj_x[::10], traj_y[::10], np.cos(traj_theta[::10]), np.sin(traj_theta[::10]), 
