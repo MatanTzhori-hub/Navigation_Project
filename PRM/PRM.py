@@ -178,7 +178,7 @@ class PRM:
                     # v, stir, self.solver.T = y.squeeze().tolist()
                     self.solver.dt = self.solver.T / 100
                     
-                    solution_limit = self.limit_by_velocity_stirring(v, stir, self.solver.T)
+                    solution_limit = self.limit_by_velocity_stirring_time(v, stir, self.solver.T)
                     if (solution_limit):
                         trajectory = utils.get_trajectory(v, stir, self.solver.T, begin_node, self.solver.L)
                         dest = utils.destination(self.solver.L, self.solver.T, v, stir, begin_node)
