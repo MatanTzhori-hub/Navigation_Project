@@ -3,47 +3,80 @@ from PRM.PRM import *
 from shapely.geometry import LineString, Polygon, Point
 import time
 import datetime
+import itertools
+import os
 
-num_nodes = 5000
-distance_radius = 20
-space_limits = [(0, 100), (0, 100)] 
+distance_radius = 15
+space_limits = [(0, 50), (0, 50)] 
 
 seed = 42
 
 # Obstacles
 map_0 = []
+map_1 = [ Polygon([(0.0, 15), (0, 18), (35, 18), (35, 15)]),  ## 2 barrier road
+          Polygon([(50, 35), (50, 32.0), (15, 32), (15, 35)]),
+          Polygon([(0.0, 0.0), (1, 0.0), (1, 50), (0.0, 50)]),
+          Polygon([(49, 0.0), (50, 0.0), (50, 50), (49, 50)])]
+map_2 = [
+    Polygon([(10.0, 10.0), (40.0, 10.0), (40.0, 12.5), (10.0, 12.5)]),
+    Polygon([(10.0, 30.0), (40.0, 35.0), (25.0, 40.0)])]
+map_3 = [
+    Polygon([(15.0, 15.0), (30.0, 15.0), (22.5, 30.0)]), ## Magen David
+    Polygon([(15.0, 25.0), (30.0, 25.0), (22.5, 10.0)])]
 
-map_1 = [ Polygon([(70.0, 50.0), (60.0, 65.0), (40.0, 65.0), (30.0, 50.0), (40.0, 35.0), (60.0, 35.0)]) ]
+# MLP model
+MLP_short = torch.load("checkpoints\model_MLP_[3, 128, 3]__12_21_17_34_22")
+MLP_deep = torch.load("checkpoints\model_MLP_[3, 256, 256, 256, 256, 256, 256, 256, 256, 3]__12_22_03_08_06")
+MOE_thin = torch.load("checkpoints\model_MOE_[3, 128, 128, 128, 3]_E5K2__12_20_11_01_03")
+MOE_wide = torch.load("checkpoints\model_MOE_[3, 128, 128, 128, 128, 3]_E13K6__12_20_13_24_23")
 
-map_2 = [ Polygon([(40, 40), (60, 60), (40, 60), (60,40)]) ]
 
-map_3 = [ Polygon([(0, 30), (70, 30), (70, 35), (0, 35)]),
-          Polygon([(100, 65), (30, 65), (30, 70), (100, 70)]),
-          Polygon([(0, 0), (1, 0), (1, 100), (0, 100)]),
-          Polygon([(99, 0), (100, 0), (100, 100), (99, 100)])]
+# Setup
+maps = [map_0, map_1, map_2, map_3]
+models = [MLP_short, MLP_deep, MOE_thin, MOE_wide]
+num_nodes = [500, 1000, 2000, 2500, 4000]
+num_nodes_solver = [50, 100, 200, 500]
 
-map_4 = [Polygon([(20, 20), (80, 20), (80, 25), (20,25)]),
-        Polygon([(20, 60), (80, 70), (50, 80)])]
 
-map_5 = [ Polygon([(30,30),(60,30),(45,60)]) , Polygon([(30,50),(60,50),(45,20)])]
+end_point = [45, 45, 0]
+start_point = [5, 5, 0]
 
-start_point = [10,10,0]
-end_point = [90,90,0]
 
-t_start =  time.time()
-prm = PRM(num_nodes, distance_radius, space_limits,start_point,end_point, map_3, seed=seed, use_mlp=True)
-prm.FindRoadMap('Dijkstra')
-t_end =  time.time()
+# Loop
+solver_pool = itertools.product(maps, num_nodes_solver)
+model_pool = itertools.product(maps, models, num_nodes)
 
-f = prm.plot()
-
-print("SimTime:" ,t_end-t_start)
-# prm.plotAsSingles()
 date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-plt.title(f"""Elapsed time: {t_end-t_start:.2f} 
-            Number of Nodes: {prm.num_nodes}, Connect Radius: {prm.distance_radius}, 
-            Theta diff before: {prm.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm.theta_diff_after*(180/np.pi):.1f}, 
-            Max distance error: {prm.max_dist_error}""")
-f.savefig(f"figures/solution_{date}.png", dpi=500)
+os.mkdir(f"figures/{date}")
+
+for combo in solver_pool:
+    t_start =  time.time()
+    map, n_nodes = combo
+    prm_solver = PRM(n_nodes, distance_radius, space_limits, start_point, end_point, map, seed=seed, model=None)
+    prm_solver.FindRoadMap('Dijkstra')
+    t_end =  time.time()
+    
+    f = prm_solver.plot()
+    plt.title(f"""Elapsed time: {t_end-t_start:.2f} 
+            Number of Nodes: {prm_solver.num_nodes}, Connect Radius: {prm_solver.distance_radius}, 
+            Theta diff before: {prm_solver.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm_solver.theta_diff_after*(180/np.pi):.1f}, 
+            Max distance error: {prm_solver.max_dist_error}""")
+    f.savefig(f"figures/{date}/Solver_{t_start}.png", dpi=500)
+    plt.close()
+
+for combo in model_pool:
+    t_start =  time.time()
+    map, model, n_nodes = combo
+    prm_mlp = PRM(n_nodes, distance_radius, space_limits,start_point,end_point, map, seed=seed, model=model)
+    prm_mlp.FindRoadMap('Dijkstra')
+    t_end =  time.time()
+
+    f = prm_mlp.plot()
+    plt.title(f"""Elapsed time: {t_end-t_start:.2f} 
+                Number of Nodes: {prm_mlp.num_nodes}, Connect Radius: {prm_mlp.distance_radius}, 
+                Theta diff before: {prm_mlp.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm_mlp.theta_diff_after*(180/np.pi):.1f}, 
+                Max distance error: {prm_mlp.max_dist_error}""")
+    f.savefig(f"figures/{date}/Model_{t_start}.png", dpi=500)
+    plt.close()
 
 #plt.show()

@@ -9,31 +9,29 @@ from .Solver_Minimize import TrajectoryOptimizer
 from scripts import utils
 
 class PRM:
-    def __init__(self, num_nodes, distance_radius, space_limits, start_point, end_point, obstacles_map=None, seed=None, use_mlp=True):
+    def __init__(self, num_nodes, distance_radius, space_limits, start_point, end_point, obstacles_map=None, seed=None, model=None):
         self.num_nodes = num_nodes
         self.distance_radius = distance_radius
         self.space_limits = space_limits
         self.obstacles = obstacles_map
-        self.use_mlp = use_mlp
         
         #limitation on road:
-        self.theta_diff_before = 135 * np.pi/180  # before finding solution
+        self.theta_diff_before = 180 * np.pi/180  # before finding solution
         self.theta_diff_after = 60 * np.pi/180   # after finding solution
         self.max_stirring = np.pi/2
-        self.max_dist_error = 0.25 #in meter
+        self.max_dist_error = 0.05 #in meter
 
         self.start_point = start_point
         self.end_point = end_point
 
         #solver's data:
-        self.solver = TrajectoryOptimizer(distance_radius=self.distance_radius)
+        self.solver = TrajectoryOptimizer(L=2, distance_radius=self.distance_radius)
         self.shortest_path = None
-
-        # MLP model
-        self.model = torch.load("checkpoints/[3, 128, 128, 128, 3]__2000__100__12_08_14_23_49")
-
+        
         self.nodes = self.generate_random_nodes(seed)
-        if self.use_mlp:
+        
+        self.model = model
+        if self.model:
             self.edges = self.generate_edge_mlp()
         else:
             self.edges = self.generate_edges()
@@ -52,28 +50,6 @@ class PRM:
         np.random.seed(None)
         return nodes
 
-    # def theta_distance(self, theta1, theta2):
-    #     diff = abs(theta1 - theta2) % (2 * np.pi)
-    #     return 2 * np.pi - diff if diff > np.pi else diff
-    
-    # def check_theta_limitation(self, node1, node2):
-    #     x1, y1, theta1 = node1
-    #     x2, y2, theta2 = node2
-    #     theta3 = self.angle_between_points((x1, y1),(x2, y2))
-    #     return self.theta_distance(theta1, theta3) < self.theta_diff and self.theta_distance(theta2, theta3) < self.theta_diff
-        
-    # def angle_between_points(self, p1, p2):
-    #     x1, y1 = p1
-    #     x2, y2 = p2
-    #     dot_product = x1 * x2 + y1 * y2
-    #     magnitude_p1 = np.sqrt(x1**2 + y1**2)
-    #     magnitude_p2 = np.sqrt(x2**2 + y2**2)
-    #     cos_theta = dot_product / (magnitude_p1 * magnitude_p2)
-    #     cos_theta = np.clip(cos_theta, -1.0, 1.0)
-    #     theta = np.arccos(cos_theta)
-    #     return theta
-        
-
     def obstacles_trajectory_intersection(self, trajectory: list):
         x_traj, y_traj, _ = trajectory
         intersects = np.zeros(len(x_traj), dtype=bool)
@@ -85,14 +61,6 @@ class PRM:
                     intersects[i] = True
 
         return intersects
-        
-    
-    # def obstacles_trajectory_intersection(self, trajectory: list):
-    #     for obstacle in self.obstacles:
-    #         for point in zip(trajectory[0][::10], trajectory[1][::10]):
-    #             if obstacle.intersects(Point(point)):
-    #                 return True
-    #     return False
 
     def oclidian_distance(self, x1, y1, x2, y2):
         return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
@@ -103,8 +71,8 @@ class PRM:
     def limit_by_theta(self, theta1, theta2, theta_error):
         return np.abs(theta1 - theta2) < theta_error
     
-    def limit_by_velocity_stirring(self, v, stirring):
-        return ( (np.array(v) > 0) & (np.abs(np.array(stirring)) < self.max_stirring))
+    def limit_by_velocity_stirring_time(self, v, stirring, T):
+        return ( (np.array(v) > 0) & (np.abs(np.array(stirring)) < self.max_stirring) & (T > 0))
     
     def translate_rotate(self, start, goal):
         start = np.array(start)
@@ -146,13 +114,14 @@ class PRM:
             y = self.model(torch.tensor(deltas))
             v, stir, T = np.array(y.T.squeeze().tolist())
             
-            solution_limit = self.limit_by_velocity_stirring(v, stir)
+            solution_limit = self.limit_by_velocity_stirring_time(v, stir, T)
             indices = indices[solution_limit]
             if len(indices) == 0: continue
             neighbors = self.nodes[indices, :]
             v, stir, T = v[solution_limit], stir[solution_limit], T[solution_limit]
             
-            trajectory = utils.get_trajectory(v, stir, T, begin_node, self.solver.L)
+            trajectory, T = utils.get_trajectory(v, stir, T, begin_node, neighbors, self.solver.L)
+            trajectory, _ = utils.get_trajectory(v, stir, T, begin_node, neighbors, self.solver.L)
             
             theta_limited_after = self.limit_by_theta(trajectory[2][:, -1], neighbors[:, 2], self.theta_diff_after)
             limit_dist = self.limit_by_distance(neighbors[:, 0], neighbors[:, 1], trajectory[0][:, -1], trajectory[1][:, -1])
@@ -209,7 +178,7 @@ class PRM:
                     # v, stir, self.solver.T = y.squeeze().tolist()
                     self.solver.dt = self.solver.T / 100
                     
-                    solution_limit = self.limit_by_velocity_stirring(v,stir)
+                    solution_limit = self.limit_by_velocity_stirring(v, stir, self.solver.T)
                     if (solution_limit):
                         trajectory = utils.get_trajectory(v, stir, self.solver.T, begin_node, self.solver.L)
                         dest = utils.destination(self.solver.L, self.solver.T, v, stir, begin_node)
