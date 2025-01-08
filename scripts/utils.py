@@ -31,7 +31,10 @@ def get_trajectory(v_optimal, phi_optimal, T_optimal, initial_state, end_state, 
         
         flag = limit_by_distance(x, y, end_state[:, 0], end_state[:, 1])
         if any(flag):
-            T_optimal[flag] = (i+1) * dt[flag]
+            if np.isscalar(dt):
+                T_optimal = (i+1) * dt
+            else:
+                T_optimal[flag] = (i+1) * dt[flag]
         
     return (trajectory_x, trajectory_y, trajectory_theta), T_optimal
 

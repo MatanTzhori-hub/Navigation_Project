@@ -180,7 +180,7 @@ class PRM:
                     
                     solution_limit = self.limit_by_velocity_stirring_time(v, stir, self.solver.T)
                     if (solution_limit):
-                        trajectory = utils.get_trajectory(v, stir, self.solver.T, begin_node, end_node, self.solver.L)
+                        trajectory, _ = utils.get_trajectory(v, stir, self.solver.T, begin_node, end_node, self.solver.L)
                         dest = utils.destination(self.solver.L, self.solver.T, v, stir, begin_node)
                         weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
 
