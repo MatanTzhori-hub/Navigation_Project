@@ -164,7 +164,7 @@ class PRM:
                 begin_node = self.nodes[node_index]
                 end_node = self.nodes[idx]
                 T_calc = self.oclidian_distance(begin_node[0], begin_node[1], end_node[0], end_node[1]) / 10
-                if (T_calc >8): T_calc =8
+                if (T_calc >8): T_calc = 8
                 if (T_calc<1): T_calc = 1
                 self.solver.T = T_calc
                 self.solver.dt = T_calc / 100
@@ -180,7 +180,7 @@ class PRM:
                     
                     solution_limit = self.limit_by_velocity_stirring_time(v, stir, self.solver.T)
                     if (solution_limit):
-                        trajectory = utils.get_trajectory(v, stir, self.solver.T, begin_node, self.solver.L)
+                        trajectory = utils.get_trajectory(v, stir, self.solver.T, begin_node, end_node, self.solver.L)
                         dest = utils.destination(self.solver.L, self.solver.T, v, stir, begin_node)
                         weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
 
