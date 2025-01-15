@@ -203,7 +203,7 @@ class PRM:
 
 
         if searchAlg == 'Dijkstra':
-            shortest_path, _ = Dijkstra(self.nodes, edges, start_index, end_index)
+            shortest_path, path_length = Dijkstra(self.nodes, edges, start_index, end_index)
         else:
             assert(0)  
         
@@ -215,7 +215,8 @@ class PRM:
         else:
             self.shortest_path = shortest_path
         # remove start and end nodes at the end.
-    
+
+        return path_length
 
     def plot(self):
         f = plt.figure(figsize=(8, 8))

@@ -59,29 +59,32 @@ for combo in solver_pool:
     t_start =  time.time()
     map, n_nodes = combo
     prm_solver = PRM(n_nodes, distance_radius, space_limits, start_point, end_point, map, seed=seed, model=None)
-    prm_solver.FindRoadMap('Dijkstra')
+    path_length = prm_solver.FindRoadMap('Dijkstra')
     t_end =  time.time()
     
     f = prm_solver.plot()
     plt.title(f"""Elapsed time: {t_end-t_start:.2f} 
             Number of Nodes: {prm_solver.num_nodes}, Connect Radius: {prm_solver.distance_radius}, 
             Theta diff before: {prm_solver.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm_solver.theta_diff_after*(180/np.pi):.1f}, 
-            Max distance error: {prm_solver.max_dist_error}""")
+            Max distance error: {prm_solver.max_dist_error}, Path Length: {path_length:.2f}""")
     f.savefig(f"figures/{date}/Solver_{t_start}.png", dpi=500)
     plt.close()
+    
+    
 
 for combo in model_pool:
     t_start =  time.time()
     map, model_name, n_nodes = combo
     model = models[model_name]
     prm_mlp = PRM(n_nodes, distance_radius, space_limits,start_point,end_point, map, seed=seed, model=model)
-    prm_mlp.FindRoadMap('Dijkstra')
+    path_length = prm_mlp.FindRoadMap('Dijkstra')
     t_end =  time.time()
 
     f = prm_mlp.plot()
     plt.title(f"""Elapsed time: {t_end-t_start:.2f} 
                 Number of Nodes: {prm_mlp.num_nodes}, Connect Radius: {prm_mlp.distance_radius}, 
                 Theta diff before: {prm_mlp.theta_diff_before*(180/np.pi):.1f}, Theta diff after: {prm_mlp.theta_diff_after*(180/np.pi):.1f}, 
-                Max distance error: {prm_mlp.max_dist_error}""")
+                Max distance error: {prm_mlp.max_dist_error}, Path Length: {path_length:.2f}""")
     f.savefig(f"figures/{date}/Model_{model_name}_{t_start}.png", dpi=500)
     plt.close()
+    
