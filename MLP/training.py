@@ -8,11 +8,8 @@ import torch
 import torch.nn as nn
 import torch.utils
 import tqdm.auto
-from torch import Tensor
 from typing import Any, Callable, Optional
-from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 
 from .train_results import FitResult, BatchResult, EpochResult
 from scripts import utils

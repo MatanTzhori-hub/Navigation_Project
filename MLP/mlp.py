@@ -153,29 +153,6 @@ class MOE(nn.Module):
             x = (x - self.xmin) / (self.xmax - self.xmin)
         
         weights, indices = self.gating(x)
-        # final_output = torch.zeros((x.shape[0], self.out_dim)).to(x.device)
-
-        # # Process each expert in parallel
-        # for i, expert in enumerate(self.experts):
-        #     # Create a mask for the inputs where the current expert is in top-k
-        #     #expert_mask = (indices == i).any(dim=-1)
-        #     expert_mask = (indices == i).sum(dim=-1)
-        #     flat_mask = expert_mask.view(-1).bool()
-
-        #     if flat_mask.sum() > 0:
-        #         expert_input = x[flat_mask]
-        #         expert_output = expert(expert_input)
-
-        #         # Extract and apply gating scores
-        #         gating_scores = gating_output[flat_mask, i].unsqueeze(1)
-        #         weighted_output = expert_output * gating_scores
-
-        #         # Update final output additively by indexing and adding
-        #         final_output[flat_mask] += weighted_output.squeeze(1)
-
-        # return final_output, indices
-        
-        # weights = self.gating(x)
         outputs = torch.stack([expert(x) for expert in self.experts], dim=2)
         weights = weights.unsqueeze(1).expand_as(outputs)
 
