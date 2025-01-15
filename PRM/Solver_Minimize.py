@@ -47,16 +47,4 @@ class TrajectoryOptimizer:
         v_optimal, phi_optimal = result.x[0], result.x[1]
         return v_optimal, phi_optimal
 
-# Usage example
-if __name__ == "__main__":
-    optimizer = TrajectoryOptimizer()
-    initial_state = [-5, 5, 0]
-    goal_state = [5, 10, np.pi/4]
-    initial_guess = [5, 0]
-    
-    v_optimal, phi_optimal = optimizer.solve(initial_state, goal_state, initial_guess)
-    print(f"Optimal v: {v_optimal}, Optimal phi: {phi_optimal}")
-
-    # Plot the optimal trajectory
-    utils.plot_trajectory(v_optimal, phi_optimal, optimizer.T, initial_state, optimizer.L)
     

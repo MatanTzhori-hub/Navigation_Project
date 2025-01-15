@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
-from shapely.geometry import LineString, Polygon, Point
+from shapely.geometry import LineString, Polygon
 
 from .SearchAlgo import *
 from .Solver_Minimize import TrajectoryOptimizer
@@ -92,7 +92,7 @@ class PRM:
         
         return np.array([*goal_rotated, theta_goal - theta_start]).T
 
-
+    # Used only for model based solution
     def generate_edge_mlp(self):
         print("-- Generating Edges --")
         
@@ -156,7 +156,8 @@ class PRM:
             self.generate_edges_curve_single_node(tree, edges, i)     
         return edges
 
-    #generate all solutions between node_index to all neighbors within distance_radius
+    # Used only for ODE solver
+    # Generate all solutions between node_index to all neighbors within distance_radius
     def generate_edges_curve_single_node(self, tree: KDTree, edges: set, node_index: int):
         indices = tree.query_ball_point(self.nodes[node_index, :2], self.distance_radius)
         for idx in indices:
@@ -172,10 +173,6 @@ class PRM:
                 theta_limited = self.limit_by_theta(begin_node[2], end_node[2],self.theta_diff_before)
                 if ( theta_limited ):
                     v, stir = self.solver.solve(begin_node, end_node)
-                    
-                    # x = torch.tensor(self.translate_rotate(begin_node, end_node)).reshape(1, 3)
-                    # y = self.model(x)
-                    # v, stir, self.solver.T = y.squeeze().tolist()
                     self.solver.dt = self.solver.T / 100
                     
                     solution_limit = self.limit_by_velocity_stirring_time(v, stir, self.solver.T)
@@ -185,7 +182,6 @@ class PRM:
                         weight = self.solver.edge_road_weight(begin_node[2], dest[2], stir)
 
                         theta_limited = self.limit_by_theta(trajectory[2][0, -1], end_node[2],self.theta_diff_after)
-                        # limit_good = any(self.limit_by_distance(x, y, end_node[0], end_node[1]) for x,y,_ in zip(*trajectory))
                         limit_good = self.limit_by_distance(end_node[0], end_node[1], trajectory[0][0, -1], trajectory[1][0, -1])
 
                         if (limit_good and theta_limited and not (self.obstacles_trajectory_intersection(trajectory) ) ):
@@ -195,12 +191,9 @@ class PRM:
     def FindRoadMap(self, searchAlg='Dijkstra'):
         print("-- Finding Solution --")
 
-        #self.nodes = np.concatenate((self.nodes, np.reshape(start_node, (1,3)), np.reshape(end_node, (1,3))), axis=0)
         start_index = len(self.nodes) - 2
         end_index = len(self.nodes) - 1
-
         edges = self.edges
-
 
         if searchAlg == 'Dijkstra':
             shortest_path, path_length = Dijkstra(self.nodes, edges, start_index, end_index)
@@ -214,31 +207,33 @@ class PRM:
             self.shortest_path = np.concatenate((self.nodes[a], self.nodes[b], c), axis=1).tolist()
         else:
             self.shortest_path = shortest_path
-        # remove start and end nodes at the end.
 
         return path_length
 
     def plot(self):
         f = plt.figure(figsize=(8, 8))
+        
+        # Plot nodes
         plt.quiver(self.nodes[:, 0], self.nodes[:, 1], np.cos(self.nodes[:, 2]), np.sin(self.nodes[:, 2]), 
                    scale=100, width=0.002, color='b', label='_Hidden label', zorder=1)
 
+        # Plot edges as straight lines
         for edge in self.edges:
             node1 = self.nodes[edge[0]]
             node2 = self.nodes[edge[1]]
             plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='black', alpha=0.3, zorder=2)
 
+        # Plot obstacles
         for obstacle in self.obstacles:
             x,y = obstacle.exterior.xy
             plt.plot(x,y, c='black', zorder=3)
 
+        # Plot path as curved lines
         if self.shortest_path is not None:
             for i in range(np.size(self.shortest_path, axis=0)):
                 start_node = self.shortest_path[i][0:3]
-                goal_node = self.shortest_path[i][3:6]
                 v = self.shortest_path[i][6]
                 phi = self.shortest_path[i][7]
-                # plt.plot([node1[0], node2[0]], [node1[1], node2[1]], color='red', alpha=1)
                 T = self.shortest_path[i][9]
                 utils.plot_trajectory(v, phi, T, start_node, self.solver.L, 'r')
 
@@ -252,7 +247,6 @@ class PRM:
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.title('PRM')
-        # plt.legend()
         plt.grid(True)
 
         return f
@@ -275,33 +269,3 @@ class PRM:
                     utils.plot_trajectory(v, phi, T, start_node, self.solver.L)
                     plt.quiver(goal_node[0], goal_node[1], np.cos(goal_node[2]), np.sin(goal_node[2]), scale=10, color='b', label='_Hidden label')
                     plt.quiver(start_node[0], start_node[1], np.cos(start_node[2]), np.sin(start_node[2]), scale=10, color='b', label='_Hidden label')
-                    
-
-            #plt.xlabel('X')
-            #plt.ylabel('Y')
-            #plt.title('PRM')
-            # plt.legend()
-            #plt.grid(True)
-            # plt.colorbar(label='Theta (radians)')
-            #plt.show()
-
-
-
-
-if __name__ == "__main__":
-    # Constants
-    num_nodes = 500
-    distance_radius = 30  # Adjust distance radius as needed
-    space_limits = [(0, 100), (0, 100)]  # Limits for x and y coordinates
-
-    # Obstacles
-    obstacle_polygons = [
-        Polygon([(20, 20), (80, 20), (80, 25), (20,25)]),
-        Polygon([(20, 60), (80, 70), (50, 80)])]
-
-    # Test
-    prm = PRM(num_nodes, distance_radius, space_limits, obstacle_polygons)
-    prm.FindRoadMap([10,20,0], [90,90,0], 'Dijkstra')
-    # prm.FindRoadMap([90,5,0], [10,95,0], 'A_Star')
-    prm.plot()
-    plt.show()
