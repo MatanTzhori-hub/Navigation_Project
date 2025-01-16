@@ -5,6 +5,7 @@ import time
 import datetime
 import itertools
 import os
+import csv
 
 distance_radius = 15
 space_limits = [(0, 50), (0, 50)] 
@@ -33,15 +34,21 @@ map_4 = [ Polygon([(10, 10), (12, 10), (12, 20), (10, 20)]),  ## 5 brariers
 
 
 # Setup
-maps = [map_0, map_1, map_2, map_3, map_4]
+maps_names = ['Empty', 'Road', 'Blockers', 'DavidStar', 'Islands']
+maps =   {'Empty': map_0,
+          'Road': map_1,
+          'Blockers': map_2,
+          'DavidStar': map_3,
+          'Islands': map_4
+          }
 models_names = ['MLP_short', 'MLP_deep', 'MOE_thin', 'MOE_wide']
 models = {"MLP_short": torch.load("checkpoints/model_MLP_[3, 128, 3]__12_21_17_34_22"),
           "MLP_deep": torch.load("checkpoints/model_MLP_[3, 256, 256, 256, 256, 256, 256, 256, 256, 3]__12_22_03_08_06"),
           "MOE_thin":torch.load("checkpoints/model_MOE_[3, 128, 128, 128, 3]_E5K2__12_20_11_01_03"),
           "MOE_wide":torch.load("checkpoints/model_MOE_[3, 128, 128, 128, 128, 3]_E13K6__12_20_13_24_23")
           }
-num_nodes = [500, 1000, 2000, 2500, 4000]
-num_nodes_solver = [50, 100, 200, 500]
+num_nodes = range(500, 4500, 500)
+num_nodes_solver = range(50, 450, 50)
 
 
 end_point = [45, 45, 0]
@@ -49,15 +56,19 @@ start_point = [5, 5, 0]
 
 
 # Loop
-solver_pool = itertools.product(maps, num_nodes_solver)
-model_pool = itertools.product(maps, models_names, num_nodes)
+solver_pool = itertools.product(maps_names, num_nodes_solver)
+model_pool = itertools.product(maps_names, models_names, num_nodes)
 
 date = datetime.datetime.now().strftime("%m_%d_%H_%M_%S")
-os.mkdir(f"figures/{date}")
+dir = f"figures/{date}"
+output_csv = f"{dir}/output.csv"
+os.mkdir(dir)
+csv_data = [['Model', 'Nodes', 'Time', 'Distance', 'Map']]
 
 for combo in solver_pool:
     t_start =  time.time()
-    map, n_nodes = combo
+    map_name, n_nodes = combo
+    map = maps[map_name]
     prm_solver = PRM(n_nodes, distance_radius, space_limits, start_point, end_point, map, seed=seed, model=None)
     path_length = prm_solver.FindRoadMap('Dijkstra')
     t_end =  time.time()
@@ -70,11 +81,12 @@ for combo in solver_pool:
     f.savefig(f"figures/{date}/Solver_{t_start}.png", dpi=500)
     plt.close()
     
-    
+    csv_data.append(['ODE_Solver', n_nodes, t_end-t_start, path_length, map_name])
 
 for combo in model_pool:
     t_start =  time.time()
-    map, model_name, n_nodes = combo
+    map_name, model_name, n_nodes = combo
+    map = maps[map_name]
     model = models[model_name]
     prm_mlp = PRM(n_nodes, distance_radius, space_limits,start_point,end_point, map, seed=seed, model=model)
     path_length = prm_mlp.FindRoadMap('Dijkstra')
@@ -88,3 +100,9 @@ for combo in model_pool:
     f.savefig(f"figures/{date}/Model_{model_name}_{t_start}.png", dpi=500)
     plt.close()
     
+    csv_data.append([model_name, n_nodes, t_end-t_start, path_length, map_name])
+
+with open(output_csv, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(csv_data)
+        
